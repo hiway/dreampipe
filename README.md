@@ -34,7 +34,7 @@ mv dreampipe-0.0.1-freebsd-arm64 ~/bin/dreampipe
 Use `dreampipe` directly in a Unix pipeline to process command output with natural language prompts:
 
 ```console
-$ df -h | dreampipe "Summarize the storage situation"
+$ df -h | dreampipe "Write a haiku about the storage situation"
 Disk space is filling,
 Over half of home is used,
 Time to clean things up.
@@ -188,13 +188,19 @@ Create scripts that auto-update based on natural language prompts. For example, 
     }
     ```
 
-Dreampipe reads the script as a Markdown file with frontmatter. 
-You can configure dreampipe from within a script by setting key = value pairs in frontmatter. 
-When `script` is set to `true`, dreampipe will save the sha256 hash of the script to identify when it changes.
-Dreampipe will then run the prompt through an LLM and save the output to a file cached by dreampipe with the sha256 hash of content as name with appropriate extension (sh, bash, py etc).
-Once the generated script is cached, dreampipe will run the script instead of calling the LLM to process the input.
-This is environmentally responsible when the input and output structures are well known and can be programmatically transformed, or when you just need a shell script or Python program to do a specific task.
-Simply write your requirements in natural language, and dreampipe will update the program and use it automatically, even when you update the prompt in your dreampipe script.
+Dreampipe processes scripts as Markdown files with YAML frontmatter, where you can configure behavior using `key: value` pairs. When you set `script: true` in the frontmatter, dreampipe implements an intelligent caching mechanism:
+
+1. It calculates a SHA256 hash of your script content to track changes
+2. The first time it runs (or after you modify the prompt), it sends the prompt to an LLM
+3. The LLM generates executable code (shell script, Python program, etc.)
+4. This generated code is cached in a file named with the content's SHA256 hash and an appropriate extension
+5. On subsequent runs, dreampipe executes the cached script directly, bypassing the LLM
+
+This approach is both efficient and environmentally responsible when:
+- Input/output structures are well-defined and can be programmatically transformed
+- You need a specific shell script or program to accomplish a task
+
+Simply express your requirements in natural language, and dreampipe handles the rest — automatically regenerating the script only when you modify your prompt.
 
 Here's a visual explanation of this auto-updating script flow:
 
