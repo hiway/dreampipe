@@ -22,20 +22,12 @@ Try it out:
 
 ```console
 echo "Hello, World!" | ./pirate-speak
+Ahoy, World!
 ```
 
 ## Prompt
 
-Dreampipe builds up the prompt that's sent to the LLM from a built-in agent prompt:
-
-```
-You are a Unix command line filter, 
-you will follow the instructions below 
-to transform, translate, convert, edit or modify 
-the input provided below to the desired outcome.
-```
-
-Then it appends your prompt from the script, and finally appends the input. Let's look at the whole prompt sent to the LLM for the `pirate-speak` example above:
+Dreampipe appends the prompt from your script to a built-in agent prompt, and finally appends the piped-in input. Let's look at the whole prompt sent to the LLM for the `pirate-speak` example above:
 
 ```
 You are a Unix command line filter, 
