@@ -40,6 +40,32 @@ Over half of home is used,
 Time to clean things up.
 ```
 
+When you run this command, dreampipe reads the instruction "Write a haiku about the storage situation." It then combines this with a built-in agent prompt and the piped-in data (output from `df -h`) to form a complete request for the LLM. The LLM's response is then outputted.
+
+Let's look at the whole prompt sent to the LLM for the example above:
+
+```
+You are a Unix command line filter, 
+you will follow the instructions below 
+to transform, translate, convert, edit or modify 
+the input provided below to the desired outcome.
+
+---
+
+Your task:
+
+Write a haiku about the storage situation
+
+---
+
+Input:
+
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1        50G   28G   20G  59% /
+tmpfs           3.0G     0  3.0G   0% /dev/shm
+/dev/sda2       450G  228G  200G  54% /home
+```
+
 Here's how the data flows in an ad-hoc pipe:
 
 ```mermaid
@@ -58,12 +84,11 @@ flowchart TD
     Stdout -- "7 - Output is displayed or piped by Shell" --> TerminalOrNextCmd["Terminal / Next command in pipeline"];
 ```
 
+### Example 2: Prompts as Saved Commands (Natural Language Scripts)
 
-### Example 2: Prompts as Saved Commands
+Save a prompt as a reusable "natural language script." `dreampipe` interprets these scripts to transform input data. For example, create a script to translate text to pirate speak:
 
-Save a prompt as a script for reuse. For example, create a script to translate text to pirate speak:
-
-1. Save the following in a file named `pirate-speak`:
+1.  Save the following in a file named `pirate-speak`:
 
     ```bash
     #!/usr/bin/env dreampipe
@@ -71,20 +96,22 @@ Save a prompt as a script for reuse. For example, create a script to translate t
     Translate input to pirate speak.
     ```
 
-2. Make the script executable:
+2.  Make the script executable:
 
     ```console
     $ chmod +x pirate-speak
     ```
 
-3. Try it out:
+3.  Try it out:
 
     ```console
     $ echo "Hello, World!" | ./pirate-speak
     Ahoy, World!
     ```
 
-Dreampipe appends the prompt from your script to a built-in agent prompt, and finally appends the piped-in input. Let's look at the whole prompt sent to the LLM for the `pirate-speak` example above:
+When you execute `pirate-speak`, the `dreampipe` interpreter (invoked by the shebang `#!/usr/bin/env dreampipe`) reads the instruction "Translate input to pirate speak." It then combines this with a built-in agent prompt and the piped-in data ("Hello, World!") to form a complete request for the LLM. The LLM's response is then outputted.
+
+Let's look at the whole prompt sent to the LLM for the `pirate-speak` example above:
 
 ```
 You are a Unix command line filter, 
@@ -107,7 +134,6 @@ Hello, World
 
 And here's a visual explanation of the data flow when used in a Unix pipeline:
 
-
 ```mermaid
 flowchart TD
     UserInput["User Command in Shell<br><code>echo 'Input Data' | ./process_data</code>"] --> Shell["Unix Shell"];
@@ -127,107 +153,7 @@ flowchart TD
     Stdout -- "8 - Output is displayed or piped by Shell" --> TerminalOrNextCmd["Terminal / Next command in pipeline"];
 ```
 
-### Example 3: Auto-updating Shell Scripts
-
-Create scripts that auto-update based on natural language prompts. For example, generate a weather report script:
-
-1. Save the following in a file named `weather-json`:
-
-    ```bash
-    #!/usr/bin/env dreampipe
-    ---
-    script: true
-    model: gemini-2.0-flash
-    ---
-
-    Shell script to use the following API to fetch 
-    and output the weather overview as JSON.
-    Use the configuration below to populate the API fields.
-    Read the appid from a toml file "~/.secrets/openweathermap.conf" 
-    which contains `appid = "..."`
-
-    Config:
-      - units: metric
-      - lat: 0
-      - lon: 0
-
-    ---
-
-    OpenWeatherMap One Call API 3.0 
-
-    Weather overview
-
-    This section describes how to get weather overview with a human-readable weather summary for today and tomorrow's forecast, utilizing OpenWeather AI technologies.
-
-    https://api.openweathermap.org/data/3.0/onecall/overview?lat={lat}&lon={lon}&appid={API key}
-
-    Parameters
-    lat 	required 	Latitude, decimal (-90; 90)
-    lon 	required 	Longitude, decimal (-180; 180)
-    appid 	required 	Your unique API key (you can always find it on your account page under the "API key" tab)
-    date 	optional 	The date the user wants to get a weather summary in the YYYY-MM-DD format. 
-    units 	optional 	Units of measurement. 
-
-    Data is available for today and tomorrow. If not specified, the current date will be used by default. Please note that the date is determined by the timezone relevant to the coordinates specified in the API request.
-
-    Standard, metric, and imperial units are available. If you do not use the units parameter, standard units will be applied by default.
-    ```
-
-2. Make the script executable:
-
-    ```console
-    $ chmod +x weather-json
-    ```
-
-3. Run the script:
-
-    ```console
-    $ weather-json
-    {
-        ...
-    }
-    ```
-
-Dreampipe processes scripts as Markdown files with YAML frontmatter, where you can configure behavior using `key: value` pairs. When you set `script: true` in the frontmatter, dreampipe implements an intelligent caching mechanism:
-
-1. It calculates a SHA256 hash of your script content to track changes
-2. The first time it runs (or after you modify the prompt), it sends the prompt to an LLM
-3. The LLM generates executable code (shell script, Python program, etc.)
-4. This generated code is cached in a file named with the content's SHA256 hash and an appropriate extension
-5. On subsequent runs, dreampipe executes the cached script directly, bypassing the LLM
-
-This approach is both efficient and environmentally responsible when:
-- Input/output structures are well-defined and can be programmatically transformed
-- You need a specific shell script or program to accomplish a task
-
-Simply express your requirements in natural language, and dreampipe handles the rest — automatically regenerating the script only when you modify your prompt.
-
-Here's a visual explanation of this auto-updating script flow:
-
-```mermaid
-flowchart TD
-    UserInput["User Command in Shell<br><code>./weather-json</code>"] --> Shell["Unix Shell"];
-    Shell -- "1 - Executes <code>./weather-json</code>" --> DreampipeScriptFile["<code>./weather-json</code><br><pre>#!/usr/bin/env dreampipe\n---\nscript: true\nmodel: ...\n---\nPrompt to generate a script...</pre>"];
-    DreampipeScriptFile -- "2 - Shebang invokes <code>dreampipe</code>" --> Dreampipe["dreampipe interpreter"];
-
-    Dreampipe -- "3 - Reads script, frontmatter (script:true),<br>calculates prompt's SHA256 hash" --> CacheCheck{"Cached script for<br>prompt SHA256 exists<br>and is current?"};
-
-    CacheCheck -- "Yes (Cache Hit)" --> ExecuteExisting["4a. Dreampipe executes existing<br>cached script from"];
-    
-    CacheCheck -- "No (Cache Miss / Prompt Changed)" --> GenerateNew["4b. Dreampipe sends script-generation<br>prompt (from <code>./weather-json</code>) to LLM"];
-    GenerateNew --> LLM_API["LLM API"];
-    LLM_API -- "5b - LLM returns<br>generated script code" --> DreampipeReceives["Dreampipe"];
-    DreampipeReceives -- "6b - Saves generated script to cache" --> CachedScript["Cached Script File<br><code>~/.cache/dreampipe/&lt;sha256&gt;.sh</code>"];
-    DreampipeReceives -- "7b - Dreampipe executes newly<br>cached script from" --> CachedScript;
-
-    ExecuteExisting --> CachedScript;
-
-    CachedScript -- "8 - Executed script produces output" --> ScriptOutput["Output from executed script"];
-    ScriptOutput -- "9 - Output written to stdout" --> Stdout["stdout"];
-    Stdout -- "10 - Shell displays/pipes output" --> TerminalOrNextCmd["Terminal / Next command in pipeline"];
-```
-
-### Example 4: Send Report for Long-Running Build
+### Example 3: Send Report for Long-Running Build
 
 Create a script to summarize the output of a long-running command, like a build process, and send a notification.
 
@@ -322,7 +248,6 @@ The `tee` command reads from standard input and writes to standard output while 
     ```console
     $ df -h | dreampipe "Summarize storage" | tee summary.txt | less
     ```
-This is an existing capability through combining `dreampipe` with `tee`.
 
 ### Process Substitution (`<()` and `>()`)
 
@@ -337,7 +262,6 @@ Process substitution is a shell feature (common in `bash`, `zsh`) that allows th
     # Hypothetical: dreampipe takes a context file and data on stdin
     $ some_command | dreampipe --context <(generate_context_dynamically) "Analyze based on context"
     ```
-This functionality is provided by the shell and can be used with `dreampipe` as with any other command.
 
 ### Structured Data Awareness
 
