@@ -1,0 +1,6 @@
+default_provider = "gemini" # Or whatever you choose as default
+request_timeout_seconds = 60
+
+[llms.gemini]
+  api_key = "YOUR_GEMINI_API_KEY"
+  # model = "gemini-2.0-flash-lite" # Optional: to override default flash model

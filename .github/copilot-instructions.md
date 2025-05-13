@@ -57,7 +57,7 @@ s
 *   **Security:**
     *   Be highly mindful of the security implications outlined in `SECURITY.md`.
     *   The tool itself should not execute arbitrary code suggested by the LLM. It only processes text.
-*   **Modularity:** Organize code into logical packages in pkg/...
+*   **Modularity:** Organize code into logical packages in internal/...
 *   **Documentation:**
     *   Comment exported functions, types, and complex logic.
     *   The `README.md` and `SECURITY.md` serve as primary user documentation.
