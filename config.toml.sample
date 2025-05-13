@@ -1,4 +1,4 @@
-default_provider = "ollama" # Or "gemini"
+default_provider = "ollama" # Or "gemini", "groq"
 request_timeout_seconds = 60 # Applies to Ollama HTTP client too
 
 [llms.gemini]
@@ -9,3 +9,8 @@ request_timeout_seconds = 60 # Applies to Ollama HTTP client too
   base_url = "http://localhost:11434" # Default, change if your Ollama is elsewhere
   model = "llama3" # Optional: specify a model available on your Ollama server
                    # If omitted, "llama3" from client.go will be used.
+
+[llms.groq]
+  api_key = "YOUR_GROQ_API_KEY"
+  # model = "mixtral-8x7b-32768" # Optional: specify another model available on Groq
+                                # If omitted, "llama3-8b-8192" from client.go will be used.
