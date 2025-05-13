@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"       // Added for executing editor
+	"path/filepath" // Added for config path
 	"strings"
 
 	// --- Internal Imports ---
@@ -18,6 +20,9 @@ var version = "dev"
 
 func main() {
 	// --- Command Line Flags ---
+	// Subcommands
+	configCmd := flag.NewFlagSet("config", flag.ExitOnError)
+
 	versionFlag := flag.Bool("version", false, "Print version information and exit")
 	// Add other potential flags here later (e.g., -provider, -config)
 	// providerFlag := flag.String("provider", "", "Override LLM provider (e.g., ollama, gemini)")
@@ -25,13 +30,28 @@ func main() {
 	// Customize flag usage message
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage:\n")
-		fmt.Fprintf(os.Stderr, "  Ad-hoc:   <command> | dreampipe [flags] \"Your natural language instruction\"\n")
-		fmt.Fprintf(os.Stderr, "  Script:   <command> | /path/to/your_script_with_dreampipe_shebang\n\n")
-		fmt.Fprintf(os.Stderr, "Flags:\n")
+		fmt.Fprintf(os.Stderr, "  dreampipe [flags] \"Your natural language instruction\"\n")
+		fmt.Fprintf(os.Stderr, "  dreampipe script /path/to/your_script_with_dreampipe_shebang\n")
+		fmt.Fprintf(os.Stderr, "  dreampipe config   # Open the configuration file in your editor\n\n")
+		fmt.Fprintf(os.Stderr, "Global Flags:\n")
 		flag.PrintDefaults()
+		// To print subcommand help: dreampipe config -h (not automatically handled by simple flag.Usage)
 	}
 
 	flag.Parse()
+
+	// --- Handle Subcommands ---
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "config":
+			configCmd.Parse(os.Args[2:]) // Parse flags for config subcommand
+			err := openConfigEditor()
+			if err != nil {
+				log.Fatalf("Error opening config: %v", err)
+			}
+			os.Exit(0)
+		}
+	}
 
 	// --- Handle Version Flag ---
 	if *versionFlag {
@@ -107,11 +127,76 @@ func main() {
 	// Run the core application logic
 	err = runner.Run(mode, instruction)
 	if err != nil {
-		// Runner is expected to print user-friendly errors to stderr via the iohandler.
-		// This exit reflects that an error occurred.
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
 	// --- Exit ---
 	os.Exit(0) // Success
+}
+
+// openConfigEditor finds an editor and opens the config file.
+func openConfigEditor() error {
+	cfgPath, err := config.GetConfigFilePath() // This function needs to be added to config package
+	if err != nil {
+		return fmt.Errorf("could not get config file path: %w", err)
+	}
+
+	// Ensure the config file and its directory exist
+	if _, statErr := os.Stat(cfgPath); os.IsNotExist(statErr) {
+		fmt.Printf("Configuration file not found at %s. Attempting to create a default one.\n", cfgPath)
+		configDir := filepath.Dir(cfgPath)
+		if mkdirErr := os.MkdirAll(configDir, config.DefaultDirPerm); mkdirErr != nil {
+			return fmt.Errorf("could not create config directory %s: %w", configDir, mkdirErr)
+		}
+		// Attempt to load (which should create a default if missing, assuming Load is robust)
+		_, loadErr := config.Load()
+		if loadErr != nil {
+			return fmt.Errorf("could not load/create initial config: %w", loadErr)
+		}
+		fmt.Printf("Default configuration file created at %s.\n", cfgPath)
+	}
+
+	editor := os.Getenv("EDITOR")
+	preferredEditors := []string{"nano", "vim", "emacs", "vi"} // Common terminal editors
+	// VS Code is handled separately due to '--wait'
+
+	if editor == "" {
+		for _, e := range preferredEditors {
+			if path, err := exec.LookPath(e); err == nil {
+				editor = path
+				break
+			}
+		}
+		// If no terminal editor found, try VS Code
+		if editor == "" {
+			if path, err := exec.LookPath("code"); err == nil {
+				editor = path // Will be 'code', args handled below
+			}
+		}
+	}
+
+	if editor == "" {
+		return fmt.Errorf("no suitable editor found. Please set your $EDITOR environment variable or install nano, vim, emacs, vi, or VS Code (code)")
+	}
+
+	var cmdArgs []string
+	cmdName := editor
+
+	// Handle VS Code specifically to add '--wait'
+	if filepath.Base(editor) == "code" {
+		// Check if 'code' is actually VS Code and supports --wait
+		// For simplicity, we assume 'code' is VS Code and add '--wait'
+		cmdArgs = append(cmdArgs, "--wait", cfgPath)
+	} else {
+		cmdArgs = append(cmdArgs, cfgPath)
+	}
+
+	cmd := exec.Command(cmdName, cmdArgs...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	fmt.Printf("Opening %s with %s...\n", cfgPath, editor)
+	return cmd.Run()
 }

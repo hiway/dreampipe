@@ -66,6 +66,20 @@ s
 
 These guidelines are crucial for maintaining codebase integrity and a smooth development workflow.
 
+Use the following emojis for checklist items:
+
+*   ⏳ for tasks that need to be done
+*   🚧 for tasks in progress
+*   ✅ for completed tasks
+*   ❌ for failed tasks
+*   ⚠️ for tasks that need to be revisited or are problematic
+*   ❓ for tasks that need clarification or are blocked
+
+*   **Code Context:**
+    *   Always refer to the existing codebase for context. Do not assume knowledge of the entire project.
+    *   If you need to understand a specific function or package, refer to the code directly.
+    *   If you need to see the entire file, ask for it explicitly.
+
 *   **Planning Edits (Mandatory for non-trivial changes):**
     1.  **Create a Checklist:** Before writing or modifying code, break down the task into a detailed checklist of sub-tasks.
     2.  **Update Checklist in Every Response:** Include this checklist at the beginning of your response and mark items as completed or in progress.

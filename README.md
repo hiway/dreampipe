@@ -27,6 +27,22 @@ Extract the binary and move it to one of the following locations:
 mv dreampipe-0.0.1-freebsd-arm64 ~/bin/dreampipe
 ```
 
+## Configuration
+
+`dreampipe` uses a configuration file located at `$XDG_CONFIG_HOME/dreampipe/config.toml` (typically `~/.config/dreampipe/config.toml`).
+
+To easily open and edit this file, you can use the `config` subcommand:
+
+```console
+$ dreampipe config
+```
+
+This command will attempt to open the configuration file in your preferred editor (from `$EDITOR` environment variable) or a common default editor if `$EDITOR` is not set (e.g., nano, vim, VS Code).
+
+If the configuration file does not exist, `dreampipe` will create a default one for you when you first run `dreampipe` or `dreampipe config`.
+
+See `config.toml.sample` for all available options.
+
 ## Usage Examples
 
 ### Example 1: Ad-hoc Pipes

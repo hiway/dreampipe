@@ -18,8 +18,8 @@ import (
 const (
 	appName         = "dreampipe"
 	configFileName  = "config.toml"
-	defaultDirPerm  = 0750 // rwxr-x---
-	defaultFilePerm = 0600 // rw------- (Contains potential secrets)
+	DefaultDirPerm  = 0750 // rwxr-x--- // EXPORTED
+	DefaultFilePerm = 0600 // rw------- (Contains potential secrets) // EXPORTED
 )
 
 // Config holds the application's configuration.
@@ -58,27 +58,25 @@ func defaultConfig() Config {
 	}
 }
 
-// getConfigPath determines the appropriate configuration file path based on XDG specs.
-func getConfigPath() (string, error) {
+// GetConfigFilePath determines the appropriate configuration file path based on XDG specs.
+// It was previously getConfigPath.
+func GetConfigFilePath() (string, error) { // EXPORTED and RENAMED
 	configHome := os.Getenv("XDG_CONFIG_HOME")
 	if configHome == "" {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
-			return "", fmt.Errorf("failed to get user home directory: %w", err)
+			return "", fmt.Errorf("could not determine user home directory: %w", err)
 		}
 		configHome = filepath.Join(homeDir, ".config")
 	}
 
-	configDirPath := filepath.Join(configHome, appName)
-	configFilePath := filepath.Join(configDirPath, configFileName)
-
-	return configFilePath, nil
+	return filepath.Join(configHome, appName, configFileName), nil
 }
 
 // Load reads the configuration file, creates it interactively if missing,
 // merges with defaults, and returns the final Config.
 func Load() (Config, error) {
-	cfgPath, err := getConfigPath()
+	cfgPath, err := GetConfigFilePath()
 	if err != nil {
 		return Config{}, fmt.Errorf("failed to determine config path: %w", err)
 	}
@@ -214,13 +212,13 @@ func createConfigFileInteractive(cfgPath string, cfg *Config) error {
 
 	// --- Create Directory ---
 	configDir := filepath.Dir(cfgPath)
-	err := os.MkdirAll(configDir, defaultDirPerm)
+	err := os.MkdirAll(configDir, DefaultDirPerm)
 	if err != nil {
 		return fmt.Errorf("failed to create config directory %s: %w", configDir, err)
 	}
 
 	// --- Write File ---
-	file, err := os.OpenFile(cfgPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, defaultFilePerm)
+	file, err := os.OpenFile(cfgPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, DefaultFilePerm)
 	if err != nil {
 		return fmt.Errorf("failed to create config file %s: %w", cfgPath, err)
 	}
