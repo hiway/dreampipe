@@ -397,6 +397,134 @@ request_timeout_seconds = 10
 	}
 }
 
+func TestDreampipe_ConfigLoading_And_OllamaClientInit(t *testing.T) {
+	ollamaBaseURL := "http://localhost:11434" // Example, could be a mock server for more advanced tests
+	configContent := fmt.Sprintf(`
+default_provider = "ollama"
+request_timeout_seconds = 15
+
+[llms.ollama]
+  base_url = "%s"
+  model = "test-ollama-model"
+`, ollamaBaseURL)
+
+	_, cleanup := createTempConfigFile(t, configContent)
+	defer cleanup()
+
+	loadedCfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("config.Load() failed: %v", err)
+	}
+	if loadedCfg.DefaultProvider != "ollama" {
+		t.Errorf("Expected default provider to be 'ollama', got '%s'", loadedCfg.DefaultProvider)
+	}
+	if ollamaCfg, ok := loadedCfg.LLMs["ollama"]; !ok || ollamaCfg.BaseURL != ollamaBaseURL || ollamaCfg.Model != "test-ollama-model" {
+		t.Errorf("Ollama config not loaded correctly. Got: %+v", ollamaCfg)
+	}
+	if loadedCfg.RequestTimeoutSeconds != 15 {
+		t.Errorf("Expected request_timeout_seconds to be 15, got %d", loadedCfg.RequestTimeoutSeconds)
+	}
+
+	fakeLLM := newFakeLLMClient("ollama", func(ctx context.Context, prompt string) (string, error) {
+		return "Fake Ollama processed: " + prompt, nil
+	})
+
+	originalGetClient := llm.GetClient
+	llm.GetClient = func(c config.Config) (llm.Client, error) {
+		if c.DefaultProvider != "ollama" {
+			return nil, fmt.Errorf("factory expected ollama provider, got %s", c.DefaultProvider)
+		}
+		ollamaSettings, _ := c.GetLLMConfig("ollama")
+		if ollamaSettings.BaseURL != ollamaBaseURL || ollamaSettings.Model != "test-ollama-model" {
+			return nil, fmt.Errorf("factory did not receive correct Ollama settings. Expected URL '%s', Model '%s'. Got URL '%s', Model '%s'",
+				ollamaBaseURL, "test-ollama-model", ollamaSettings.BaseURL, ollamaSettings.Model)
+		}
+		if c.RequestTimeoutSeconds != 15 {
+			return nil, fmt.Errorf("factory did not receive correct RequestTimeoutSeconds. Expected 15, got %d", c.RequestTimeoutSeconds)
+		}
+		return fakeLLM, nil
+	}
+	defer func() { llm.GetClient = originalGetClient }()
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+	streams := &iohandler.Streams{In: strings.NewReader("ollama test input"), Out: &stdoutBuf, Err: &stderrBuf}
+	runner := app.NewRunner(loadedCfg, streams)
+
+	err = runner.Run(app.ModeAdHoc, "Ollama config load test instruction")
+	if err != nil {
+		t.Errorf("runner.Run() with loaded ollama config failed: %v. Stderr: %s", err, stderrBuf.String())
+	}
+
+	expectedOutput := "Fake Ollama processed"
+	if !strings.Contains(stdoutBuf.String(), expectedOutput) {
+		t.Errorf("Expected stdout to contain '%s', got '%s'", expectedOutput, stdoutBuf.String())
+	}
+}
+
+func TestDreampipe_ConfigLoading_And_GroqClientInit(t *testing.T) {
+	groqAPIKey := "TEST_GROQ_API_KEY_FROM_CONFIG"
+	configContent := fmt.Sprintf(`
+default_provider = "groq"
+request_timeout_seconds = 25
+
+[llms.groq]
+  api_key = "%s"
+  model = "test-groq-model"
+`, groqAPIKey)
+
+	_, cleanup := createTempConfigFile(t, configContent)
+	defer cleanup()
+
+	loadedCfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("config.Load() failed: %v", err)
+	}
+	if loadedCfg.DefaultProvider != "groq" {
+		t.Errorf("Expected default provider to be 'groq', got '%s'", loadedCfg.DefaultProvider)
+	}
+	if groqCfg, ok := loadedCfg.LLMs["groq"]; !ok || groqCfg.APIKey != groqAPIKey || groqCfg.Model != "test-groq-model" {
+		t.Errorf("Groq config not loaded correctly. Got: %+v", groqCfg)
+	}
+	if loadedCfg.RequestTimeoutSeconds != 25 {
+		t.Errorf("Expected request_timeout_seconds to be 25, got %d", loadedCfg.RequestTimeoutSeconds)
+	}
+
+	fakeLLM := newFakeLLMClient("groq", func(ctx context.Context, prompt string) (string, error) {
+		return "Fake Groq processed: " + prompt, nil
+	})
+
+	originalGetClient := llm.GetClient
+	llm.GetClient = func(c config.Config) (llm.Client, error) {
+		if c.DefaultProvider != "groq" {
+			return nil, fmt.Errorf("factory expected groq provider, got %s", c.DefaultProvider)
+		}
+		groqSettings, _ := c.GetLLMConfig("groq")
+		if groqSettings.APIKey != groqAPIKey || groqSettings.Model != "test-groq-model" {
+			return nil, fmt.Errorf("factory did not receive correct Groq settings. Expected APIKey '%s', Model '%s'. Got APIKey '%s', Model '%s'",
+				groqAPIKey, "test-groq-model", groqSettings.APIKey, groqSettings.Model)
+		}
+		if c.RequestTimeoutSeconds != 25 {
+			return nil, fmt.Errorf("factory did not receive correct RequestTimeoutSeconds. Expected 25, got %d", c.RequestTimeoutSeconds)
+		}
+		return fakeLLM, nil
+	}
+	defer func() { llm.GetClient = originalGetClient }()
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+	streams := &iohandler.Streams{In: strings.NewReader("groq test input"), Out: &stdoutBuf, Err: &stderrBuf}
+	runner := app.NewRunner(loadedCfg, streams)
+
+	err = runner.Run(app.ModeAdHoc, "Groq config load test instruction")
+	if err != nil {
+		t.Errorf("runner.Run() with loaded groq config failed: %v. Stderr: %s", err, stderrBuf.String())
+	}
+
+	expectedOutput := "Fake Groq processed"
+	if !strings.Contains(stdoutBuf.String(), expectedOutput) {
+		t.Errorf("Expected stdout to contain '%s', got '%s'", expectedOutput, stdoutBuf.String())
+	}
+}
+
 func TestDreampipe_MissingProviderConfig(t *testing.T) {
 	cfg := config.Config{
 		DefaultProvider:       "nonexistentLLM", // This provider is not in LLMs map
