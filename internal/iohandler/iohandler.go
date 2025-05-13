@@ -71,11 +71,9 @@ func (s *Streams) WriteToStdout(data []byte) error {
 		_, nlErr := s.Out.Write([]byte("\n"))
 		if nlErr != nil {
 			// Log the newline error but prioritize the original write error if any
-			if err == nil {
-				return fmt.Errorf("failed to write newline to stdout: %w", nlErr)
-			}
-			fmt.Fprintf(s.Err, "Warning: failed to write trailing newline to stdout: %v\n", nlErr)
+			return fmt.Errorf("failed to write newline to stdout: %w", nlErr)
 		}
+		// fmt.Fprintf(s.Err, "Warning: failed to write trailing newline to stdout: %v\n", nlErr)
 	}
 	return err
 }

@@ -66,6 +66,7 @@ s
 
 These guidelines are crucial for maintaining codebase integrity and a smooth development workflow.
 
+Create checklists as simple lists "-⏳ Task".
 Use the following emojis for checklist items:
 
 *   ⏳ for tasks that need to be done

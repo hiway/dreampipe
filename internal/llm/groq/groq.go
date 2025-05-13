@@ -87,7 +87,7 @@ type groqChatCompletionResponse struct {
 // debugMode controls verbose logging.
 func NewClient(apiKey string, modelOverride string, requestTimeoutSeconds int, debugMode bool) (*Client, error) {
 	if apiKey == "" {
-		return nil, fmt.Errorf("Groq API key is required")
+		return nil, fmt.Errorf("groq API key is required")
 	}
 
 	modelToUse := defaultGroqModel
@@ -115,7 +115,7 @@ func NewClient(apiKey string, modelOverride string, requestTimeoutSeconds int, d
 // For Groq's chat completion, we need to adapt our single prompt into a user message.
 func (c *Client) Generate(ctx context.Context, prompt string) (string, error) {
 	if c.httpClient == nil {
-		return "", fmt.Errorf("Groq client not initialized")
+		return "", fmt.Errorf("groq client not initialized")
 	}
 
 	// Groq's chat completion API expects a list of messages.
@@ -149,28 +149,32 @@ func (c *Client) Generate(ctx context.Context, prompt string) (string, error) {
 	var lastErr error
 
 	for i := 0; i <= maxRetries; i++ {
-		req, err := http.NewRequestWithContext(ctx, "POST", groqAPIEndpoint, bytes.NewBuffer(payloadBytes))
-		if err != nil {
-			return "", fmt.Errorf("failed to create Groq request: %w", err)
+		req, reqErr := http.NewRequestWithContext(ctx, "POST", groqAPIEndpoint, bytes.NewBuffer(payloadBytes))
+		if reqErr != nil {
+			return "", fmt.Errorf("failed to create Groq request: %w", reqErr)
 		}
 		req.Header.Set("Authorization", "Bearer "+c.apiKey)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
 
-		resp, err = c.httpClient.Do(req)
-		if err != nil {
-			lastErr = fmt.Errorf("failed to send request to Groq API: %w", err)
+		respErr := func() error {
+			var err error
+			resp, err = c.httpClient.Do(req)
+			return err
+		}()
+		if respErr != nil {
+			lastErr = fmt.Errorf("failed to send request to Groq API: %w", respErr)
 			if ctx.Err() == context.Canceled || ctx.Err() == context.DeadlineExceeded {
 				return "", lastErr // Don't retry on context errors
 			}
-			log.Printf("Groq request attempt %d failed: %v. Retrying in %v...", i+1, err, retryDelay)
+			log.Printf("Groq request attempt %d failed: %v. Retrying in %v...", i+1, respErr, retryDelay)
 			time.Sleep(retryDelay)
 			continue
 		}
 		// If request was successful (even if API returned an error status), break retry loop
 		break
 	}
-	if err != nil { // This means all retries failed
+	if lastErr != nil { // This means all retries failed
 		return "", lastErr
 	}
 	defer resp.Body.Close()
@@ -188,12 +192,12 @@ func (c *Client) Generate(ctx context.Context, prompt string) (string, error) {
 
 	// Check for API-level errors returned in the JSON body
 	if groqResp.Error != nil {
-		return "", fmt.Errorf("Groq API error: %s (Type: %s, Code: %s). HTTP Status: %s", groqResp.Error.Message, groqResp.Error.Type, groqResp.Error.Code, resp.Status)
+		return "", fmt.Errorf("groq API error: %s (Type: %s, Code: %s). HTTP Status: %s", groqResp.Error.Message, groqResp.Error.Type, groqResp.Error.Code, resp.Status)
 	}
 
 	// Check HTTP status code after checking for JSON error, as JSON error might be more specific
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("Groq API request failed with status %s. Body: %s", resp.Status, string(responseBody))
+		return "", fmt.Errorf("groq API request failed with status %s. Body: %s", resp.Status, string(responseBody))
 	}
 
 	if len(groqResp.Choices) == 0 || groqResp.Choices[0].Message.Content == "" {
@@ -207,7 +211,7 @@ func (c *Client) Generate(ctx context.Context, prompt string) (string, error) {
 				return "N/A"
 			}(),
 			groqResp.Usage)
-		return "", fmt.Errorf("Groq response contained no choices or empty message content. HTTP Status: %s", resp.Status)
+		return "", fmt.Errorf("groq response contained no choices or empty message content. HTTP Status: %s", resp.Status)
 	}
 
 	return strings.TrimSpace(groqResp.Choices[0].Message.Content), nil

@@ -121,13 +121,13 @@ func TestDreampipe_AdHocMode_Success(t *testing.T) {
 
 	// Override the llm.GetClient factory for this test
 	originalGetClient := llm.GetClient
-	llm.GetClient = func(c config.Config) (llm.Client, error) {
+	llm.GetClient = func(c config.Config, debugMode bool) (llm.Client, error) {
 		return fakeLLM, nil
 	}
 	defer func() { llm.GetClient = originalGetClient }()
 
 	var stdoutBuf, stderrBuf bytes.Buffer
-	stdinPipeReader, stdinPipeWriter, _ := os.Pipe()
+	stdinPipeReader, _, _ := os.Pipe() // stdinPipeWriter is not used directly here
 
 	streams := &iohandler.Streams{
 		In:  stdinPipeReader,
@@ -258,13 +258,13 @@ Translate this script input.`
 	})
 
 	originalGetClient := llm.GetClient
-	llm.GetClient = func(c config.Config) (llm.Client, error) {
+	llm.GetClient = func(c config.Config, debugMode bool) (llm.Client, error) {
 		return fakeLLM, nil
 	}
 	defer func() { llm.GetClient = originalGetClient }()
 
 	var stdoutBuf, stderrBuf bytes.Buffer
-	stdinPipeReader, stdinPipeWriter, _ := os.Pipe()
+	stdinPipeReader, stdinPipeWriter, _ := os.Pipe() // stdinPipeWriter IS used in the goroutine
 
 	streams := &iohandler.Streams{
 		In:  stdinPipeReader,
@@ -406,7 +406,7 @@ func TestDreampipe_LLMError(t *testing.T) {
 	})
 
 	originalGetClient := llm.GetClient
-	llm.GetClient = func(c config.Config) (llm.Client, error) { return fakeLLM, nil }
+	llm.GetClient = func(c config.Config, debugMode bool) (llm.Client, error) { return fakeLLM, nil }
 	defer func() { llm.GetClient = originalGetClient }()
 
 	var stdoutBuf, stderrBuf bytes.Buffer
@@ -465,7 +465,7 @@ func TestDreampipe_LLMTimeout(t *testing.T) {
 	})
 
 	originalGetClient := llm.GetClient
-	llm.GetClient = func(c config.Config) (llm.Client, error) { return fakeLLM, nil }
+	llm.GetClient = func(c config.Config, debugMode bool) (llm.Client, error) { return fakeLLM, nil }
 	defer func() { llm.GetClient = originalGetClient }()
 
 	var stdoutBuf, stderrBuf bytes.Buffer
@@ -525,7 +525,7 @@ request_timeout_seconds = 10
 	defer cleanup()
 
 	// Load the actual config to ensure it parses
-	loadedCfg, err := config.Load()
+	loadedCfg, err := config.Load(false) // Pass false for non-interactive mode
 	if err != nil {
 		t.Fatalf("config.Load() failed: %v", err)
 	}
@@ -542,7 +542,7 @@ request_timeout_seconds = 10
 	})
 
 	originalGetClient := llm.GetClient
-	llm.GetClient = func(c config.Config) (llm.Client, error) {
+	llm.GetClient = func(c config.Config, debugMode bool) (llm.Client, error) {
 		// Check if the config passed to GetClient has the expected API key
 		if c.DefaultProvider != "gemini" {
 			return nil, fmt.Errorf("factory expected gemini provider, got %s", c.DefaultProvider)
@@ -584,7 +584,7 @@ request_timeout_seconds = 15
 	_, cleanup := createTempConfigFile(t, configContent)
 	defer cleanup()
 
-	loadedCfg, err := config.Load()
+	loadedCfg, err := config.Load(false) // Pass false for non-interactive mode
 	if err != nil {
 		t.Fatalf("config.Load() failed: %v", err)
 	}
@@ -603,7 +603,7 @@ request_timeout_seconds = 15
 	})
 
 	originalGetClient := llm.GetClient
-	llm.GetClient = func(c config.Config) (llm.Client, error) {
+	llm.GetClient = func(c config.Config, debugMode bool) (llm.Client, error) {
 		if c.DefaultProvider != "ollama" {
 			return nil, fmt.Errorf("factory expected ollama provider, got %s", c.DefaultProvider)
 		}
@@ -648,7 +648,7 @@ request_timeout_seconds = 25
 	_, cleanup := createTempConfigFile(t, configContent)
 	defer cleanup()
 
-	loadedCfg, err := config.Load()
+	loadedCfg, err := config.Load(false) // Pass false for non-interactive mode
 	if err != nil {
 		t.Fatalf("config.Load() failed: %v", err)
 	}
@@ -667,7 +667,7 @@ request_timeout_seconds = 25
 	})
 
 	originalGetClient := llm.GetClient
-	llm.GetClient = func(c config.Config) (llm.Client, error) {
+	llm.GetClient = func(c config.Config, debugMode bool) (llm.Client, error) {
 		if c.DefaultProvider != "groq" {
 			return nil, fmt.Errorf("factory expected groq provider, got %s", c.DefaultProvider)
 		}
@@ -710,7 +710,7 @@ func TestDreampipe_MissingProviderConfig(t *testing.T) {
 	// We don't need to mock GetClient here, as the error should happen before that,
 	// or GetClient itself should return an error.
 	// Let's test the factory directly for this case.
-	_, err := llm.GetClient(cfg)
+	_, err := llm.GetClient(cfg, false) // Pass false for debugMode
 	if err == nil {
 		t.Fatalf("llm.GetClient should have failed for unconfigured provider, but got nil")
 	}
