@@ -24,6 +24,8 @@ func main() {
 	configCmd := flag.NewFlagSet("config", flag.ExitOnError)
 
 	versionFlag := flag.Bool("version", false, "Print version information and exit")
+	debugFlagShort := flag.Bool("d", false, "Enable debug mode (shorthand)")
+	debugFlagLong := flag.Bool("debug", false, "Enable debug mode")
 	// Add other potential flags here later (e.g., -provider, -config)
 	// providerFlag := flag.String("provider", "", "Override LLM provider (e.g., ollama, gemini)")
 
@@ -45,7 +47,9 @@ func main() {
 		switch os.Args[1] {
 		case "config":
 			configCmd.Parse(os.Args[2:]) // Parse flags for config subcommand
-			err := openConfigEditor()
+			// Determine debug mode for openConfigEditor as well, in case it calls config.Load
+			debugModeForConfig := *debugFlagShort || *debugFlagLong
+			err := openConfigEditor(debugModeForConfig)
 			if err != nil {
 				log.Fatalf("Error opening config: %v", err)
 			}
@@ -59,13 +63,20 @@ func main() {
 		os.Exit(0)
 	}
 
+	// Determine debug mode status
+	debugMode := *debugFlagShort || *debugFlagLong
+
 	// --- Load Configuration ---
 	// Placeholder: Implement loading from environment variables, config files etc.
 	// The config should contain API keys, default provider, timeouts, etc.
-	cfg, err := config.Load()
+	cfg, err := config.Load(debugMode)
 	if err != nil {
 		// Use log.Fatalf for critical startup errors
-		log.Fatalf("Error loading configuration: %v", err)
+		// If debug mode is on, print more info, otherwise, config.Load already prints to Stderr.
+		if debugMode {
+			log.Printf("Verbose error loading configuration: %+v", err)
+		}
+		log.Fatalf("Error loading configuration: %v (run with -d or --debug for more details if available)", err)
 	}
 	// Example: Override provider from flag if implemented
 	// if *providerFlag != "" {
@@ -122,7 +133,7 @@ func main() {
 	}
 
 	// --- Create and Run Application ---
-	runner := app.NewRunner(cfg, stdio) // Inject dependencies
+	runner := app.NewRunner(cfg, stdio, debugMode) // Inject dependencies
 
 	// Run the core application logic
 	err = runner.Run(mode, instruction)
@@ -136,7 +147,7 @@ func main() {
 }
 
 // openConfigEditor finds an editor and opens the config file.
-func openConfigEditor() error {
+func openConfigEditor(debugMode bool) error {
 	cfgPath, err := config.GetConfigFilePath() // This function needs to be added to config package
 	if err != nil {
 		return fmt.Errorf("could not get config file path: %w", err)
@@ -144,17 +155,21 @@ func openConfigEditor() error {
 
 	// Ensure the config file and its directory exist
 	if _, statErr := os.Stat(cfgPath); os.IsNotExist(statErr) {
-		fmt.Printf("Configuration file not found at %s. Attempting to create a default one.\n", cfgPath)
+		if debugMode {
+			fmt.Printf("Configuration file not found at %s. Attempting to create a default one.\n", cfgPath)
+		}
 		configDir := filepath.Dir(cfgPath)
 		if mkdirErr := os.MkdirAll(configDir, config.DefaultDirPerm); mkdirErr != nil {
 			return fmt.Errorf("could not create config directory %s: %w", configDir, mkdirErr)
 		}
 		// Attempt to load (which should create a default if missing, assuming Load is robust)
-		_, loadErr := config.Load()
+		_, loadErr := config.Load(debugMode)
 		if loadErr != nil {
 			return fmt.Errorf("could not load/create initial config: %w", loadErr)
 		}
-		fmt.Printf("Default configuration file created at %s.\n", cfgPath)
+		if debugMode {
+			fmt.Printf("Default configuration file created at %s.\n", cfgPath)
+		}
 	}
 
 	editor := os.Getenv("EDITOR")
@@ -197,6 +212,8 @@ func openConfigEditor() error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	fmt.Printf("Opening %s with %s...\n", cfgPath, editor)
+	if debugMode {
+		fmt.Printf("Opening %s with %s...\n", cfgPath, editor)
+	}
 	return cmd.Run()
 }

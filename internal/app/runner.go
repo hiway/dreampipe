@@ -20,14 +20,25 @@ const agentPrompt = `You are a Unix command line filter, you will follow the ins
 type Runner struct {
 	config  config.Config
 	streams *iohandler.Streams
+	debug   bool
 	// llmClient llm.Client // Store the client if initialized once
 }
 
 // NewRunner creates a new Runner instance with its dependencies.
-func NewRunner(cfg config.Config, streams *iohandler.Streams) *Runner {
+func NewRunner(cfg config.Config, streams *iohandler.Streams, debugMode bool) *Runner {
 	return &Runner{
 		config:  cfg,
 		streams: streams,
+		debug:   debugMode,
+	}
+}
+
+// LogInfo writes an informational message to stderr if debug mode is enabled.
+func (r *Runner) LogInfo(format string, args ...interface{}) {
+	if r.debug {
+		// We don't need to check the error here as WriteInfoToStderr already handles it.
+		// If it fails, it will print its own error to stderr (if possible) or return an error.
+		_ = r.streams.WriteInfoToStderr(format, args...)
 	}
 }
 
@@ -48,19 +59,19 @@ func (r *Runner) Run(mode RunMode, instructionOrPath string) error {
 
 	// Inform user what instruction is being used (useful for script mode)
 	if mode == ModeScript {
-		r.streams.WriteInfoToStderr("Using instruction from script '%s'", instructionOrPath)
+		r.LogInfo("Using instruction from script '%s'", instructionOrPath)
 	}
 
 	// 2. Read input data from stdin
 	// Note: This reads *all* input, respecting the current limitation.
-	r.streams.WriteInfoToStderr("Reading from stdin...") // Inform user
+	r.LogInfo("Reading from stdin...") // Inform user
 	inputDataBytes, err := r.streams.ReadAllFromStdin()
 	if err != nil {
 		r.streams.WriteErrorToStderr("Error reading from stdin: %v", err)
 		return err
 	}
 	inputData := string(inputDataBytes)
-	r.streams.WriteInfoToStderr("Finished reading stdin (%d bytes)", len(inputDataBytes))
+	r.LogInfo("Finished reading stdin (%d bytes)", len(inputDataBytes))
 
 	// 3. Construct the final prompt
 	// TODO: Implement the prompt package properly.
@@ -68,14 +79,14 @@ func (r *Runner) Run(mode RunMode, instructionOrPath string) error {
 	finalPrompt := prompt.Build(agentPrompt, userInstruction, inputData)
 	// --- Placeholder for prompt.Build ---
 	// finalPrompt := fmt.Sprintf("%s\n\n---\n\nYour task:\n\n%s\n\n---\n\nInput:\n\n%s",
-	// 	agentPrompt, userInstruction, inputData)
+	// agentPrompt, userInstruction, inputData)
 	// --- End Placeholder ---
 
 	// 4. Initialize LLM Client
 	// TODO: Implement the llm package and factory properly.
 	// Assuming a factory function GetClient for now.
-	r.streams.WriteInfoToStderr("Initializing LLM client for provider: %s", r.config.DefaultProvider)
-	llmClient, err := llm.GetClient(r.config) // Pass config to factory
+	r.LogInfo("Initializing LLM client for provider: %s", r.config.DefaultProvider)
+	llmClient, err := llm.GetClient(r.config, r.debug)
 	if err != nil {
 		r.streams.WriteErrorToStderr("Error initializing LLM client: %v", err)
 		return err
@@ -83,12 +94,12 @@ func (r *Runner) Run(mode RunMode, instructionOrPath string) error {
 	// --- Placeholder for llm.Client and llm.GetClient ---
 	// type placeholderLLMClient struct{}
 	// func (c *placeholderLLMClient) Generate(ctx context.Context, p string) (string, error) {
-	// 	// Simulate LLM call
-	// 	time.Sleep(50 * time.Millisecond)
-	// 	if strings.Contains(p, "fail") { // Test error case
-	// 		return "", fmt.Errorf("simulated LLM error")
-	// 	}
-	// 	return fmt.Sprintf("LLM processed prompt for task: '%s'", userInstruction), nil
+	// // Simulate LLM call
+	// time.Sleep(50 * time.Millisecond)
+	// if strings.Contains(p, "fail") { // Test error case
+	// return "", fmt.Errorf("simulated LLM error")
+	// }
+	// return fmt.Sprintf("LLM processed prompt for task: '%s'", userInstruction), nil
 	// }
 	// llmClient := &placeholderLLMClient{}
 	// --- End Placeholder ---
@@ -97,7 +108,7 @@ func (r *Runner) Run(mode RunMode, instructionOrPath string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(r.config.RequestTimeoutSeconds)*time.Second)
 	defer cancel()
 
-	r.streams.WriteInfoToStderr("Sending request to LLM...")
+	r.LogInfo("Sending request to LLM...")
 	llmResponse, err := llmClient.Generate(ctx, finalPrompt) // Assumes Generate method exists
 	if err != nil {
 		r.streams.WriteErrorToStderr("Error during LLM request: %v", err)
@@ -107,7 +118,7 @@ func (r *Runner) Run(mode RunMode, instructionOrPath string) error {
 		}
 		return err
 	}
-	r.streams.WriteInfoToStderr("Received LLM response")
+	r.LogInfo("Received LLM response")
 
 	// 6. Write LLM response to stdout
 	err = r.streams.WriteStringToStdout(llmResponse)
@@ -118,6 +129,6 @@ func (r *Runner) Run(mode RunMode, instructionOrPath string) error {
 	}
 
 	// 7. Success
-	r.streams.WriteInfoToStderr("Done.")
+	r.LogInfo("Done.")
 	return nil
 }

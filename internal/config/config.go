@@ -75,7 +75,7 @@ func GetConfigFilePath() (string, error) { // EXPORTED and RENAMED
 
 // Load reads the configuration file, creates it interactively if missing,
 // merges with defaults, and returns the final Config.
-func Load() (Config, error) {
+func Load(debugMode bool) (Config, error) { // MODIFIED: Added debugMode
 	cfgPath, err := GetConfigFilePath()
 	if err != nil {
 		return Config{}, fmt.Errorf("failed to determine config path: %w", err)
@@ -88,14 +88,18 @@ func Load() (Config, error) {
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			// Config file doesn't exist, ask to create
-			fmt.Printf("Configuration file not found at %s\n", cfgPath)
+			if debugMode {
+				fmt.Printf("Configuration file not found at %s\n", cfgPath)
+			}
 			if askToCreateConfigFile() {
-				err = createConfigFileInteractive(cfgPath, &cfg) // Pass pointer to modify cfg
+				err = createConfigFileInteractive(cfgPath, &cfg, debugMode) // MODIFIED: Pass debugMode
 				if err != nil {
 					return Config{}, fmt.Errorf("failed to create configuration file: %w", err)
 				}
 				// File created, proceed to load (or just use the interactively filled cfg)
-				fmt.Printf("Configuration file created successfully at %s\n", cfgPath)
+				if debugMode {
+					fmt.Printf("Configuration file created successfully at %s\n", cfgPath)
+				}
 				// No need to reload here, createConfigFileInteractive populates cfg
 			} else {
 				return Config{}, errors.New("configuration file creation declined by user")
@@ -106,7 +110,9 @@ func Load() (Config, error) {
 		}
 	} else {
 		// File exists, load it and merge over defaults
-		fmt.Printf("Loading configuration from %s\n", cfgPath) // Inform user
+		if debugMode {
+			fmt.Printf("Loading configuration from %s\n", cfgPath) // MODIFIED: Conditional print
+		}
 		meta, err := toml.DecodeFile(cfgPath, &cfg)
 		if err != nil {
 			return Config{}, fmt.Errorf("failed to decode TOML config file %s: %w", cfgPath, err)
@@ -136,7 +142,7 @@ func askToCreateConfigFile() bool {
 }
 
 // createConfigFileInteractive guides the user through setting up the initial config.
-func createConfigFileInteractive(cfgPath string, cfg *Config) error {
+func createConfigFileInteractive(cfgPath string, cfg *Config, debugMode bool) error { // MODIFIED: Added debugMode
 	reader := bufio.NewReader(os.Stdin)
 	configuredProvider := false
 
@@ -148,9 +154,9 @@ func createConfigFileInteractive(cfgPath string, cfg *Config) error {
 	ollamaURLInput, _ := reader.ReadString('\n')
 	ollamaURLInput = strings.TrimSpace(ollamaURLInput)
 	if ollamaURLInput != "" {
-		if err := validateOllamaURL(ollamaURLInput); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: Ollama URL validation failed: %v. Using provided URL anyway.\n", err)
-			// return fmt.Errorf("invalid Ollama URL '%s': %w", ollamaURLInput, err) // Or be strict
+		if err := validateOllamaURL(ollamaURLInput, debugMode); err != nil { // MODIFIED: Pass debugMode
+			// Warning is printed by validateOllamaURL if debugMode is true
+			// fmt.Fprintf(os.Stderr, "Warning: Ollama URL validation failed: %v. Using provided URL anyway.\n", err)
 		}
 		cfg.LLMs["ollama"] = LLMConfig{BaseURL: ollamaURLInput} // Update map entry
 		configuredProvider = true
@@ -236,7 +242,7 @@ func createConfigFileInteractive(cfgPath string, cfg *Config) error {
 }
 
 // validateOllamaURL attempts to connect to the Ollama base URL.
-func validateOllamaURL(rawURL string) error {
+func validateOllamaURL(rawURL string, debugMode bool) error { // MODIFIED: Added debugMode
 	if rawURL == "" {
 		return errors.New("URL cannot be empty")
 	}
@@ -264,6 +270,10 @@ func validateOllamaURL(rawURL string) error {
 
 	resp, err := client.Do(req)
 	if err != nil {
+		// Only print warning if in debug mode, otherwise fail more silently for interactive setup
+		if debugMode {
+			fmt.Fprintf(os.Stderr, "Warning: Ollama URL validation failed for %s: %v.\n", rawURL, err)
+		}
 		return fmt.Errorf("failed to connect to Ollama server at %s: %w", rawURL, err)
 	}
 	defer resp.Body.Close()
@@ -271,11 +281,12 @@ func validateOllamaURL(rawURL string) error {
 	// Allow various success codes, maybe even 404 if the base path doesn't serve anything specific
 	// but the connection worked. The main goal is reachability.
 	// if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-	//  return fmt.Errorf("server responded with status %s", resp.Status)
+	// return fmt.Errorf("server responded with status %s", resp.Status)
 	// }
 	// For now, just succeeding the connection is good enough validation.
-
-	fmt.Printf("Successfully connected to Ollama at %s (Status: %s)\n", rawURL, resp.Status)
+	if debugMode {
+		fmt.Printf("Successfully connected to Ollama at %s (Status: %s)\n", rawURL, resp.Status) // MODIFIED: Conditional print
+	}
 	return nil
 }
 

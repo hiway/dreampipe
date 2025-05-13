@@ -135,34 +135,100 @@ func TestDreampipe_AdHocMode_Success(t *testing.T) {
 		Err: &stderrBuf,
 	}
 
-	runner := app.NewRunner(cfg, streams)
-
+	// Test without debug mode
+	runnerNoDebug := app.NewRunner(cfg, streams, false)
 	go func() {
-		defer stdinPipeWriter.Close()
-		fmt.Fprint(stdinPipeWriter, "Test input data")
+		// Need to reset or use a new pipe for each run if input is consumed
+		// For this test, let's re-pipe for clarity, though a single pipe could be managed.
+		pReader, pWriter, _ := os.Pipe()
+		streams.In = pReader // Update streams.In for this run
+		defer pWriter.Close()
+		fmt.Fprint(pWriter, "Test input data no debug")
 	}()
 
-	instruction := "Test ad-hoc instruction"
-	err := runner.Run(app.ModeAdHoc, instruction)
+	instruction := "Test ad-hoc instruction no debug"
+	err := runnerNoDebug.Run(app.ModeAdHoc, instruction)
 
 	if err != nil {
-		t.Errorf("runner.Run() failed: %v. Stderr: %s", err, stderrBuf.String())
+		t.Errorf("runnerNoDebug.Run() failed: %v. Stderr: %s", err, stderrBuf.String())
 	}
-
 	expectedOutput := "LLM says: Ad-hoc processed!"
 	if !strings.Contains(stdoutBuf.String(), expectedOutput) {
-		t.Errorf("Expected stdout to contain '%s', got '%s'", expectedOutput, stdoutBuf.String())
+		t.Errorf("Expected stdout (no debug) to contain '%s', got '%s'", expectedOutput, stdoutBuf.String())
 	}
-	if stderrBuf.Len() > 0 && !strings.Contains(stderrBuf.String(), "INFO") { // Allow info messages
-		t.Logf("Stderr: %s", stderrBuf.String()) // Log stderr for debugging if it's not just INFO
+	// In non-debug mode, stderr should be empty or contain only actual errors (not info)
+	// config.Load might print "Loading configuration from..." which is an info message not controlled by app.Runner debug flag.
+	// For this unit test, we focus on app.Runner's behavior.
+	// We will allow "Loading configuration from..." as it's from config.Load.
+	// And "Using default Gemini model..." as it's from the gemini client.
+	// And "Using default Ollama model..." as it's from the ollama client.
+	// And "Using default Groq model..." as it's from the groq client.
+	// And "Successfully connected to Ollama..." as it's from config validation.
+	// And "Warning: Ollama URL validation failed..."
+	stderrString := stderrBuf.String()
+	allowedStderrPrefixes := []string{
+		"Loading configuration from",
+		"Using default Gemini model",
+		"Using default Ollama model",
+		"Using default Groq model",
+		"Successfully connected to Ollama",
+		"Warning: Ollama URL validation failed",
+	}
+	isAllowedStderr := false
+	for _, prefix := range allowedStderrPrefixes {
+		if strings.HasPrefix(stderrString, prefix) {
+			isAllowedStderr = true
+			break
+		}
+	}
+	if stderrString != "" && !isAllowedStderr && !strings.Contains(stderrString, "simulated LLM error") && !strings.Contains(stderrString, "LLM request timed out") && !strings.Contains(stderrString, "context deadline exceeded") {
+		// Check if it contains any of the runner's specific info messages that should be suppressed
+		suppressedMessages := []string{"Reading from stdin...", "Finished reading stdin", "Initializing LLM client", "Sending request to LLM...", "Received LLM response", "Done."}
+		for _, msg := range suppressedMessages {
+			if strings.Contains(stderrString, msg) {
+				t.Errorf("Expected stderr (no debug) to not contain info message '%s', but got: %s", msg, stderrString)
+				break
+			}
+		}
+	}
+	stdoutBuf.Reset()
+	stderrBuf.Reset() // Reset for the debug run
+
+	// Test with debug mode
+	runnerDebug := app.NewRunner(cfg, streams, true)
+	go func() {
+		pReader, pWriter, _ := os.Pipe()
+		streams.In = pReader // Update streams.In for this run
+		defer pWriter.Close()
+		fmt.Fprint(pWriter, "Test input data debug")
+	}()
+	instructionDebug := "Test ad-hoc instruction debug"
+	err = runnerDebug.Run(app.ModeAdHoc, instructionDebug)
+
+	if err != nil {
+		t.Errorf("runnerDebug.Run() failed: %v. Stderr: %s", err, stderrBuf.String())
+	}
+	if !strings.Contains(stdoutBuf.String(), expectedOutput) {
+		t.Errorf("Expected stdout (debug) to contain '%s', got '%s'", expectedOutput, stdoutBuf.String())
+	}
+	// In debug mode, stderr should contain info messages
+	debugStderr := stderrBuf.String()
+	expectedInfoMessages := []string{"Reading from stdin...", "Finished reading stdin", "Initializing LLM client", "Sending request to LLM...", "Received LLM response", "Done."}
+	for _, msg := range expectedInfoMessages {
+		if !strings.Contains(debugStderr, msg) {
+			// Allow "Loading configuration from..." as it's from config.Load
+			if !strings.Contains(debugStderr, "Loading configuration from") && !strings.Contains(debugStderr, "Using default Gemini model") && !strings.Contains(debugStderr, "Using default Ollama model") && !strings.Contains(debugStderr, "Using default Groq model") && !strings.Contains(debugStderr, "Successfully connected to Ollama") && !strings.Contains(debugStderr, "Warning: Ollama URL validation failed") {
+				t.Errorf("Expected stderr (debug) to contain info message '%s', but got: %s", msg, debugStderr)
+			}
+		}
 	}
 
-	// Check prompt sent to LLM
+	// Check prompt sent to LLM (check the one from the debug run)
 	lastPrompt := fakeLLM.GetLastPrompt()
-	if !strings.Contains(lastPrompt, "Test input data") {
+	if !strings.Contains(lastPrompt, "Test input data debug") {
 		t.Errorf("LLM prompt missing input data. Got: %s", lastPrompt)
 	}
-	if !strings.Contains(lastPrompt, "Test ad-hoc instruction") {
+	if !strings.Contains(lastPrompt, "Test ad-hoc instruction debug") {
 		t.Errorf("LLM prompt missing instruction. Got: %s", lastPrompt)
 	}
 }
@@ -205,7 +271,7 @@ Translate this script input.`
 		Out: &stdoutBuf,
 		Err: &stderrBuf,
 	}
-	runner := app.NewRunner(cfg, streams)
+	runner := app.NewRunner(cfg, streams, false) // Test with debug false first
 
 	go func() {
 		defer stdinPipeWriter.Close()
@@ -222,6 +288,32 @@ Translate this script input.`
 	if !strings.Contains(stdoutBuf.String(), expectedOutput) {
 		t.Errorf("Expected stdout for script mode to contain '%s', got '%s'", expectedOutput, stdoutBuf.String())
 	}
+	// Check stderr for no info messages (similar to AdHocMode test)
+	stderrString := stderrBuf.String()
+	allowedStderrPrefixes := []string{
+		"Loading configuration from",
+		"Using default Gemini model",
+		"Using default Ollama model",
+		"Using default Groq model",
+		"Successfully connected to Ollama",
+		"Warning: Ollama URL validation failed",
+	}
+	isAllowedStderr := false
+	for _, prefix := range allowedStderrPrefixes {
+		if strings.HasPrefix(stderrString, prefix) {
+			isAllowedStderr = true
+			break
+		}
+	}
+	if stderrString != "" && !isAllowedStderr {
+		suppressedMessages := []string{"Using instruction from script", "Reading from stdin...", "Finished reading stdin", "Initializing LLM client", "Sending request to LLM...", "Received LLM response", "Done."}
+		for _, msg := range suppressedMessages {
+			if strings.Contains(stderrString, msg) {
+				t.Errorf("Expected stderr (script mode, no debug) to not contain info message '%s', but got: %s", msg, stderrString)
+				break
+			}
+		}
+	}
 
 	lastPrompt := fakeLLM.GetLastPrompt()
 	if !strings.Contains(lastPrompt, "Piped script data") {
@@ -230,13 +322,50 @@ Translate this script input.`
 	if !strings.Contains(lastPrompt, "Translate this script input.") {
 		t.Errorf("LLM prompt (script mode) missing instruction. Got: %s", lastPrompt)
 	}
+
+	// Test with debug true
+	stdoutBuf.Reset()
+	stderrBuf.Reset()
+	fakeLLM.promptsSent = []string{} // Reset prompts for the new run
+
+	// Need a new pipe for stdin for the second run
+	stdinPipeReaderDebug, stdinPipeWriterDebug, _ := os.Pipe()
+	streams.In = stdinPipeReaderDebug // Update streams.In for this run
+
+	runnerDebug := app.NewRunner(cfg, streams, true)
+	go func() {
+		defer stdinPipeWriterDebug.Close()
+		fmt.Fprint(stdinPipeWriterDebug, "Piped script data debug")
+	}()
+
+	err = runnerDebug.Run(app.ModeScript, scriptPath)
+	if err != nil {
+		t.Errorf("runnerDebug.Run() failed for script mode: %v. Stderr: %s", err, stderrBuf.String())
+	}
+	if !strings.Contains(stdoutBuf.String(), expectedOutput) {
+		t.Errorf("Expected stdout (script mode, debug) to contain '%s', got '%s'", expectedOutput, stdoutBuf.String())
+	}
+	debugStderr := stderrBuf.String()
+	expectedInfoMessages := []string{"Using instruction from script", "Reading from stdin...", "Finished reading stdin", "Initializing LLM client", "Sending request to LLM...", "Received LLM response", "Done."}
+	for _, msg := range expectedInfoMessages {
+		if !strings.Contains(debugStderr, msg) {
+			// Allow "Loading configuration from..." as it's from config.Load
+			if !strings.Contains(debugStderr, "Loading configuration from") && !strings.Contains(debugStderr, "Using default Gemini model") && !strings.Contains(debugStderr, "Using default Ollama model") && !strings.Contains(debugStderr, "Using default Groq model") && !strings.Contains(debugStderr, "Successfully connected to Ollama") && !strings.Contains(debugStderr, "Warning: Ollama URL validation failed") {
+				t.Errorf("Expected stderr (script mode, debug) to contain info message '%s', but got: %s", msg, debugStderr)
+			}
+		}
+	}
+	lastPromptDebug := fakeLLM.GetLastPrompt()
+	if !strings.Contains(lastPromptDebug, "Piped script data debug") {
+		t.Errorf("LLM prompt (script mode, debug) missing input data. Got: %s", lastPromptDebug)
+	}
 }
 
 func TestDreampipe_AdHocMode_MissingInstruction(t *testing.T) {
 	cfg := config.Config{DefaultProvider: "fakeLLM", LLMs: map[string]config.LLMConfig{"fakeLLM": {}}}
 	var stdoutBuf, stderrBuf bytes.Buffer
 	streams := &iohandler.Streams{In: strings.NewReader("some input"), Out: &stdoutBuf, Err: &stderrBuf}
-	runner := app.NewRunner(cfg, streams)
+	runner := app.NewRunner(cfg, streams, false)
 
 	err := runner.Run(app.ModeAdHoc, "") // Empty instruction
 	if err == nil {
@@ -252,7 +381,7 @@ func TestDreampipe_ScriptMode_FileNotExist(t *testing.T) {
 	cfg := config.Config{DefaultProvider: "fakeLLM", LLMs: map[string]config.LLMConfig{"fakeLLM": {}}}
 	var stdoutBuf, stderrBuf bytes.Buffer
 	streams := &iohandler.Streams{In: strings.NewReader("some input"), Out: &stdoutBuf, Err: &stderrBuf}
-	runner := app.NewRunner(cfg, streams)
+	runner := app.NewRunner(cfg, streams, false)
 
 	err := runner.Run(app.ModeScript, "/path/to/nonexistent/script")
 	if err == nil {
@@ -282,7 +411,7 @@ func TestDreampipe_LLMError(t *testing.T) {
 
 	var stdoutBuf, stderrBuf bytes.Buffer
 	streams := &iohandler.Streams{In: strings.NewReader("input"), Out: &stdoutBuf, Err: &stderrBuf}
-	runner := app.NewRunner(cfg, streams)
+	runner := app.NewRunner(cfg, streams, false) // Debug false, errors should still print
 
 	err := runner.Run(app.ModeAdHoc, "test prompt")
 	if err == nil {
@@ -294,6 +423,25 @@ func TestDreampipe_LLMError(t *testing.T) {
 	if stdoutBuf.Len() > 0 {
 		t.Errorf("Expected empty stdout on LLM error, got: %s", stdoutBuf.String())
 	}
+
+	// Test with debug true, error message should still be the same
+	stderrBuf.Reset()
+	runnerDebug := app.NewRunner(cfg, streams, true)
+	err = runnerDebug.Run(app.ModeAdHoc, "test prompt")
+	if err == nil {
+		t.Errorf("Expected error from LLM to propagate (debug mode), but got nil")
+	}
+	// Error messages are distinct from info messages. Debug mode should show info + errors. Non-debug should show only errors.
+	// The "Error during LLM request" is an error message, so it should always appear.
+	// Debug mode will add other info messages around it.
+	if !strings.Contains(stderrBuf.String(), "Error during LLM request: simulated LLM API error") {
+		t.Errorf("Expected LLM error message in stderr (debug mode), got: %s", stderrBuf.String())
+	}
+	// Check that debug info messages are also present
+	if !strings.Contains(stderrBuf.String(), "Reading from stdin...") {
+		t.Errorf("Expected debug info 'Reading from stdin...' in stderr (debug mode with error), got: %s", stderrBuf.String())
+	}
+
 }
 
 func TestDreampipe_LLMTimeout(t *testing.T) {
@@ -322,7 +470,7 @@ func TestDreampipe_LLMTimeout(t *testing.T) {
 
 	var stdoutBuf, stderrBuf bytes.Buffer
 	streams := &iohandler.Streams{In: strings.NewReader("input"), Out: &stdoutBuf, Err: &stderrBuf}
-	runner := app.NewRunner(cfg, streams)
+	runner := app.NewRunner(cfg, streams, false) // Debug false
 
 	err := runner.Run(app.ModeAdHoc, "test prompt for timeout")
 	if err == nil {
@@ -331,6 +479,31 @@ func TestDreampipe_LLMTimeout(t *testing.T) {
 	// Check for context deadline exceeded or our specific timeout message
 	if !strings.Contains(stderrBuf.String(), "LLM request timed out") && !strings.Contains(strings.ToLower(stderrBuf.String()), "context deadline exceeded") {
 		t.Errorf("Expected timeout error message in stderr, got: %s", stderrBuf.String())
+	}
+
+	// Test with debug true
+	stderrBuf.Reset()
+	stdoutBuf.Reset()                                // Ensure stdout is clean for this check
+	runnerDebug := app.NewRunner(cfg, streams, true) // Debug true
+	// Need to re-pipe stdin as it might have been consumed or closed by the previous run's context
+	stdinReaderDebug, stdinWriterDebug, _ := os.Pipe()
+	streams.In = stdinReaderDebug
+
+	go func() {
+		defer stdinWriterDebug.Close()
+		fmt.Fprint(stdinWriterDebug, "input for debug timeout")
+	}()
+
+	err = runnerDebug.Run(app.ModeAdHoc, "test prompt for timeout debug")
+	if err == nil {
+		t.Errorf("Expected timeout error (debug mode), but got nil")
+	}
+	if !strings.Contains(stderrBuf.String(), "LLM request timed out") && !strings.Contains(strings.ToLower(stderrBuf.String()), "context deadline exceeded") {
+		t.Errorf("Expected timeout error message in stderr (debug mode), got: %s", stderrBuf.String())
+	}
+	// Check that debug info messages are also present before the error
+	if !strings.Contains(stderrBuf.String(), "Sending request to LLM...") {
+		t.Errorf("Expected debug info 'Sending request to LLM...' in stderr (debug mode with timeout), got: %s", stderrBuf.String())
 	}
 }
 
@@ -384,7 +557,7 @@ request_timeout_seconds = 10
 
 	var stdoutBuf, stderrBuf bytes.Buffer
 	streams := &iohandler.Streams{In: strings.NewReader("config test input"), Out: &stdoutBuf, Err: &stderrBuf}
-	runner := app.NewRunner(loadedCfg, streams) // Use the loadedCfg
+	runner := app.NewRunner(loadedCfg, streams, false) // Use the loadedCfg, debug false
 
 	err = runner.Run(app.ModeAdHoc, "Config load test instruction")
 	if err != nil {
@@ -448,7 +621,7 @@ request_timeout_seconds = 15
 
 	var stdoutBuf, stderrBuf bytes.Buffer
 	streams := &iohandler.Streams{In: strings.NewReader("ollama test input"), Out: &stdoutBuf, Err: &stderrBuf}
-	runner := app.NewRunner(loadedCfg, streams)
+	runner := app.NewRunner(loadedCfg, streams, false) // Debug false
 
 	err = runner.Run(app.ModeAdHoc, "Ollama config load test instruction")
 	if err != nil {
@@ -512,7 +685,7 @@ request_timeout_seconds = 25
 
 	var stdoutBuf, stderrBuf bytes.Buffer
 	streams := &iohandler.Streams{In: strings.NewReader("groq test input"), Out: &stdoutBuf, Err: &stderrBuf}
-	runner := app.NewRunner(loadedCfg, streams)
+	runner := app.NewRunner(loadedCfg, streams, false) // Debug false
 
 	err = runner.Run(app.ModeAdHoc, "Groq config load test instruction")
 	if err != nil {
@@ -548,7 +721,7 @@ func TestDreampipe_MissingProviderConfig(t *testing.T) {
 	// Also test the runner's behavior (it should fail early)
 	var stdoutBuf, stderrBuf bytes.Buffer
 	streams := &iohandler.Streams{In: strings.NewReader("input"), Out: &stdoutBuf, Err: &stderrBuf}
-	runner := app.NewRunner(cfg, streams)
+	runner := app.NewRunner(cfg, streams, false) // Debug false
 
 	runErr := runner.Run(app.ModeAdHoc, "test")
 	if runErr == nil {

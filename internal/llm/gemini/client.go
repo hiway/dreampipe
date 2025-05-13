@@ -23,14 +23,17 @@ type Client struct {
 
 // NewClient creates a new Gemini client.
 // It requires a context for initialization (can be context.Background()),
-// the API key, and an optional model name (defaults to gemini-1.5-flash-latest).
-func NewClient(ctx context.Context, apiKey string, modelOverride string) (*Client, error) {
+// the API key, an optional model name (defaults to gemini-1.5-flash-latest),
+// and a debugMode flag.
+func NewClient(ctx context.Context, apiKey string, modelOverride string, debugMode bool) (*Client, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("Gemini API key is required")
 	}
 
 	genaiClient, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
+		// This log is more of a system/developer error, so keep it for now, or make it debug conditional too.
+		// For now, let's assume it's important enough to always show if client creation fails.
 		log.Printf("Error initializing Google GenAI client: %v. Make sure your API key is valid and has permissions.", err)
 		return nil, fmt.Errorf("failed to create genai client: %w. [2, 5]", err)
 	}
@@ -38,9 +41,13 @@ func NewClient(ctx context.Context, apiKey string, modelOverride string) (*Clien
 	modelToUse := defaultGeminiModel
 	if modelOverride != "" {
 		modelToUse = modelOverride
-		log.Printf("Using overridden Gemini model: %s", modelToUse)
+		if debugMode {
+			log.Printf("Using overridden Gemini model: %s", modelToUse)
+		}
 	} else {
-		log.Printf("Using default Gemini model: %s", modelToUse)
+		if debugMode {
+			log.Printf("Using default Gemini model: %s", modelToUse)
+		}
 	}
 
 	return &Client{
@@ -88,6 +95,8 @@ func (c *Client) Generate(ctx context.Context, prompt string) (string, error) {
 		} else {
 			// dreampipe currently only expects text output from the LLM.
 			// If other parts are returned (e.g. function calls, blobs), we ignore them for now.
+			// This log can be noisy, consider making it debug conditional if it becomes an issue.
+			// For now, keeping it as it indicates unexpected parts.
 			log.Printf("Gemini client received non-text part: %T. Ignoring.", part)
 		}
 	}

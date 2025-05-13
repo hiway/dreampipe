@@ -84,7 +84,8 @@ type groqChatCompletionResponse struct {
 }
 
 // NewClient creates a new Groq client.
-func NewClient(apiKey string, modelOverride string, requestTimeoutSeconds int) (*Client, error) {
+// debugMode controls verbose logging.
+func NewClient(apiKey string, modelOverride string, requestTimeoutSeconds int, debugMode bool) (*Client, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("Groq API key is required")
 	}
@@ -92,9 +93,13 @@ func NewClient(apiKey string, modelOverride string, requestTimeoutSeconds int) (
 	modelToUse := defaultGroqModel
 	if modelOverride != "" {
 		modelToUse = modelOverride
-		log.Printf("Using overridden Groq model: %s", modelToUse)
+		if debugMode {
+			log.Printf("Using overridden Groq model: %s", modelToUse)
+		}
 	} else {
-		log.Printf("Using default Groq model: %s", modelToUse)
+		if debugMode {
+			log.Printf("Using default Groq model: %s", modelToUse)
+		}
 	}
 
 	return &Client{

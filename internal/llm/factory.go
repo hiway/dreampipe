@@ -14,7 +14,7 @@ import (
 // GetClient is a factory function that returns an LLM client based on the
 // DefaultProvider specified in the configuration.
 // Making it a variable to allow for easy mocking in tests.
-var GetClient func(cfg config.Config) (Client, error) = func(cfg config.Config) (Client, error) {
+var GetClient func(cfg config.Config, debugMode bool) (Client, error) = func(cfg config.Config, debugMode bool) (Client, error) {
 	providerName := cfg.DefaultProvider
 	if providerName == "" {
 		return nil, fmt.Errorf("no default LLM provider specified in configuration")
@@ -35,17 +35,17 @@ var GetClient func(cfg config.Config) (Client, error) = func(cfg config.Config) 
 		if llmCfg.APIKey == "" {
 			return nil, fmt.Errorf("API key for Gemini not found in configuration")
 		}
-		return gemini.NewClient(context.Background(), llmCfg.APIKey, llmCfg.Model)
+		return gemini.NewClient(context.Background(), llmCfg.APIKey, llmCfg.Model, debugMode)
 	case "ollama":
 		if llmCfg.BaseURL == "" {
 			return nil, fmt.Errorf("base URL for Ollama not found in configuration")
 		}
-		return ollama.NewClient(llmCfg.BaseURL, llmCfg.Model, requestTimeout)
-	case "groq": // ADDED CASE
+		return ollama.NewClient(llmCfg.BaseURL, llmCfg.Model, requestTimeout, debugMode)
+	case "groq":
 		if llmCfg.APIKey == "" {
 			return nil, fmt.Errorf("API key for Groq not found in configuration")
 		}
-		return groq.NewClient(llmCfg.APIKey, llmCfg.Model, requestTimeout)
+		return groq.NewClient(llmCfg.APIKey, llmCfg.Model, requestTimeout, debugMode)
 	default:
 		return nil, fmt.Errorf("unsupported LLM provider: %s", providerName)
 	}

@@ -58,7 +58,8 @@ type ollamaGenerateResponse struct {
 // NewClient creates a new Ollama client.
 // baseURL is the address of the Ollama server (e.g., "http://localhost:11434").
 // modelOverride is an optional model name to use instead of the default.
-func NewClient(baseURL string, modelOverride string, requestTimeoutSeconds int) (*Client, error) {
+// debugMode controls verbose logging.
+func NewClient(baseURL string, modelOverride string, requestTimeoutSeconds int, debugMode bool) (*Client, error) {
 	if baseURL == "" {
 		return nil, fmt.Errorf("Ollama base URL is required")
 	}
@@ -76,9 +77,13 @@ func NewClient(baseURL string, modelOverride string, requestTimeoutSeconds int) 
 	modelToUse := defaultOllamaModel
 	if modelOverride != "" {
 		modelToUse = modelOverride
-		log.Printf("Using overridden Ollama model: %s", modelToUse)
+		if debugMode {
+			log.Printf("Using overridden Ollama model: %s", modelToUse)
+		}
 	} else {
-		log.Printf("Using default Ollama model: %s", modelToUse)
+		if debugMode {
+			log.Printf("Using default Ollama model: %s", modelToUse)
+		}
 	}
 
 	return &Client{
