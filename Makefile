@@ -37,6 +37,19 @@ install: build
 	@cp $(BINARY_NAME) $(INSTALL_DIR)/$(BINARY_NAME)
 	@echo "$(BINARY_NAME) installed to $(INSTALL_DIR)/$(BINARY_NAME)"
 
+## install-examples: Install example scripts to $(INSTALL_DIR)
+.PHONY: install-examples
+install-examples:
+	@echo "Installing example scripts to $(INSTALL_DIR)..."
+	@mkdir -p $(INSTALL_DIR)
+	@for example_file in examples/*.md; do \
+		filename=$$(basename "$$example_file" .md); \
+		echo "Installing $$filename to $(INSTALL_DIR)/$$filename..."; \
+		cp "$$example_file" "$(INSTALL_DIR)/$$filename"; \
+		chmod +x "$(INSTALL_DIR)/$$filename"; \
+	done
+	@echo "Example scripts installed."
+
 ## help: Show this help message
 .PHONY: help
 help:

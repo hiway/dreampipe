@@ -27,6 +27,46 @@ Extract the binary and move it to one of the following locations:
 mv dreampipe-0.0.1-freebsd-arm64 ~/bin/dreampipe
 ```
 
+### Or, Build from Source
+
+Alternatively, you can clone the repository and build `dreampipe` from source using Make. This method is suitable if you want the latest development version or want to contribute to the project.
+
+1.  **Clone the repository:**
+    ```console
+    git clone https://github.com/hiway/dreampipe.git
+    cd dreampipe
+    ```
+
+2.  **Build and install:**
+    ```console
+    make install
+    ```
+    This command will:
+    *   Build the `dreampipe` binary from the source code.
+    *   Install the binary to `~/bin/dreampipe`. Ensure `~/bin` is in your `PATH`.
+
+### Installing Example Scripts
+
+The project includes a variety of example scripts in the `examples/` directory. These scripts demonstrate different use cases for `dreampipe` and can be installed into your `~/bin` directory to be used as commands.
+
+To install these example scripts, you can use the `install-examples` target in the Makefile:
+
+```console
+make install-examples
+```
+
+This command will:
+1. Create the `~/bin` directory if it doesn't already exist.
+2. Copy each example script (e.g., `examples/eli5.md`) to `~/bin/eli5`.
+3. Make each installed script executable (e.g., `chmod +x ~/bin/eli5`).
+
+After running this, you can use the example scripts directly:
+
+```console
+$ echo "Large language models are very powerful." | eli5
+Large language models are like super smart talking parrots. You can tell them something, and they can say it back to you in a really simple way, like you're a little kid! They know lots and lots of words and can understand what you mean, even if you say it in a tricky way. So, if you have something big and complicated, they can help make it easy-peasy to understand!
+```
+
 ## Configuration
 
 `dreampipe` uses a configuration file located at `$XDG_CONFIG_HOME/dreampipe/config.toml` (typically `~/.config/dreampipe/config.toml`).
