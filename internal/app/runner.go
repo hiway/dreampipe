@@ -7,6 +7,7 @@ import (
 
 	// --- Internal Imports ---
 	"github.com/hiway/dreampipe/internal/config"    // Adjust import path
+	"github.com/hiway/dreampipe/internal/filters"   // Add filters package
 	"github.com/hiway/dreampipe/internal/iohandler" // Adjust import path
 	"github.com/hiway/dreampipe/internal/llm"       // Adjust import path - Placeholder
 	"github.com/hiway/dreampipe/internal/prompt"    // Adjust import path - Placeholder
@@ -120,8 +121,16 @@ func (r *Runner) Run(mode RunMode, instructionOrPath string) error {
 	}
 	r.LogInfo("Received LLM response")
 
+	// Apply output filters
+	// For now, we only have one filter. Later, this could be a list of filters.
+	outputFilter := &filters.MarkdownCodeBlockFilter{}
+	filteredResponse := outputFilter.Apply(llmResponse)
+	if len(filteredResponse) != len(llmResponse) {
+		r.LogInfo("Applied MarkdownCodeBlockFilter, output length changed from %d to %d", len(llmResponse), len(filteredResponse))
+	}
+
 	// 6. Write LLM response to stdout
-	err = r.streams.WriteStringToStdout(llmResponse)
+	err = r.streams.WriteStringToStdout(filteredResponse)
 	if err != nil {
 		// This is tricky, stdout might be closed or broken. Log to stderr.
 		r.streams.WriteErrorToStderr("Error writing LLM response to stdout: %v", err)
