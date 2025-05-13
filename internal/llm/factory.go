@@ -13,7 +13,7 @@ import (
 
 // GetClient is a factory function that returns an LLM client based on the
 // DefaultProvider specified in the configuration.
-func GetClient(cfg config.Config) (Client, error) {
+var GetClient func(cfg config.Config) (Client, error) = func(cfg config.Config) (Client, error) {
 	providerName := cfg.DefaultProvider
 	if providerName == "" {
 		return nil, fmt.Errorf("no default LLM provider specified in configuration")
