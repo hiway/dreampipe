@@ -4,15 +4,7 @@
 
 `dreampipe` is a tool designed to integrate the capabilities of Large Language Models (LLMs) with the Unix shell environment. It allows processing command output and transforming data using natural language prompts, either ad-hoc or via reusable "natural language scripts."
 
-This document outlines known security risks, mitigation strategies, best practices for users, and procedures for reporting vulnerabilities. While `dreampipe` itself does not execute LLM-generated code, interacting with LLMs still presents security considerations users should be aware of.
-
-## Reporting Vulnerabilities
-
-We take security seriously. If you discover a security vulnerability in `dreampipe`, please report it privately to ensure responsible disclosure. Do **not** create a public GitHub issue for security vulnerabilities.
-
-Please report vulnerabilities via [**Specify preferred reporting method here - e.g., GitHub Security Advisories if enabled, or a dedicated private email address like security@yourdomain.com**].
-
-We aim to acknowledge receipt of vulnerability reports within [Specify timeframe, e.g., 48 hours] and will work with you to understand and address the issue.
+This document outlines known security risks, mitigation strategies, best practices for users. While `dreampipe` itself does not execute LLM-generated code, interacting with LLMs still presents security considerations users should be aware of.
 
 ## Key Security Risks
 
@@ -65,25 +57,8 @@ Using `dreampipe` safely requires vigilance:
     *   **Never** include raw secrets directly in your `dreampipe` prompts.
 5.  **Run with Least Privilege:** Execute `dreampipe` commands as a non-root user whenever possible.
 6.  **Keep `dreampipe` Updated:** Install updates promptly to benefit from security patches and improvements.
-7.  **Understand Your LLM:** Be aware of the capabilities, limitations, and potential biases of the configured LLM (Gemini, Ollama, Groq, etc.).
+7.  **Understand Your LLM:** Be aware of the capabilities, limitations, and potential biases of the configured LLM model.
 
-## Security Measures Implemented / Planned
-
-The `dreampipe` project aims to incorporate the following security measures:
-
-**Implemented (or MUST be implemented):**
-
-*   **Clear Prompt Separation:** Internally, maintain clear separation between system instructions, user prompts, and piped-in data sent to the LLM to mitigate prompt injection risks.
-*   **Prominent Security Warnings:** Include clear warnings in documentation (like this file) about the nature of LLM interactions.
-
-**Planned / Highly Recommended (SHOULD):**
-
-*   **Input/Output Size Limits:** Implement configurable limits to prevent basic memory exhaustion and API abuse DoS.
-*   **Verbose/Debug Mode:** Offer a mode to display the exact final prompt sent to the LLM for transparency and debugging.
-
-**Under Consideration (COULD):**
-
-*   **Dependency Management:** Keep dependencies updated and audited.
 
 ## Disclaimer
 
