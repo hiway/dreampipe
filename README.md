@@ -17,15 +17,75 @@ Time to clean things up.
 
 Download the latest release for your system from the [Releases](https://github.com/hiway/dreampipe/releases) page.
 
-Extract the binary and move it to one of the following locations:
+### Download and Extract
 
-- `~/bin/dreampipe`: *Recommended*, install for yourself.
-- `/usr/local/bin/dreampipe`: system-wide install, requires admin access.
+1. **Download the appropriate archive** for your system:
+   - Linux: `dreampipe-{version}-linux-amd64.tar.gz` or `dreampipe-{version}-linux-arm64.tar.gz`
+   - macOS: `dreampipe-{version}-darwin-amd64.tar.gz` or `dreampipe-{version}-darwin-arm64.tar.gz`
+   - FreeBSD: `dreampipe-{version}-freebsd-amd64.tar.gz` or `dreampipe-{version}-freebsd-arm64.tar.gz`
 
-**Example command below, you'll need to use the name of the binary you downloaded:**
-```console
-mv dreampipe-0.0.1-freebsd-arm64 ~/bin/dreampipe
-```
+   **Optional but recommended:** Also download `checksums.txt` to verify the integrity of your download:
+   ```console
+   # Verify checksum (Linux/macOS/FreeBSD)
+   sha256sum -c --ignore-missing checksums.txt
+   # Or on macOS:
+   shasum -a 256 -c --ignore-missing checksums.txt
+   ```
+
+2. **Extract the archive** using standard tools available on all platforms:
+   ```console
+   # Replace with your downloaded filename
+   tar -xzf dreampipe-v1.0.0-linux-amd64.tar.gz
+   cd dreampipe-v1.0.0-linux-amd64
+   ```
+
+3. **Install the binary** to one of the following locations:
+   - `~/bin/dreampipe`: *Recommended*, install for yourself
+   - `/usr/local/bin/dreampipe`: system-wide install, requires admin access
+
+   **For user installation** (recommended):
+   ```console
+   # Create ~/bin directory if it doesn't exist
+   mkdir -p ~/bin
+   
+   # Move the binary
+   mv dreampipe ~/bin/dreampipe
+   
+   # Make sure ~/bin is in your PATH (choose one based on your shell)
+   # For bash/zsh:
+   echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc
+   source ~/.bashrc
+   
+   # For zsh (if using zsh):
+   echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshrc
+   source ~/.zshrc
+   ```
+
+   **For system-wide installation:**
+   ```console
+   # Requires admin privileges
+   sudo mv dreampipe /usr/local/bin/dreampipe
+   ```
+
+4. **Optionally install example scripts** to `~/bin/`:
+   ```console
+   # Create ~/bin directory if it doesn't exist
+   mkdir -p ~/bin
+   
+   # Copy example scripts (removes .md extension) and make them executable
+   for script in examples/*.md; do
+       basename=$(basename "$script" .md)
+       cp "$script" ~/bin/"$basename"
+       chmod +x ~/bin/"$basename"
+   done
+   ```
+   
+   This will install scripts like `examples/eli5.md` as `~/bin/eli5`, making them available as commands.
+
+5. **Verify installation:**
+   ```console
+   dreampipe --version
+   ```
 
 ### Or, Build from Source
 
