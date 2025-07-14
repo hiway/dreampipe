@@ -1,0 +1,33 @@
+# .github/workflows/release.yml
+name: Go Release
+
+on:
+  push:
+    tags:
+      - 'v*' # This workflow runs on tags starting with 'v', e.g., v1.0.0
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed to create releases
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # GoReleaser requires the full git history to generate changelogs
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable' # Use the latest stable version of Go
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          # The version of GoReleaser to use.
+          version: latest
+          # The arguments to pass to GoReleaser.
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

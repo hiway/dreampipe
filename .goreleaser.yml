@@ -1,0 +1,96 @@
+# .goreleaser.yml
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod tidy
+    - go mod download
+
+builds:
+  - id: "dreampipe"
+    main: ./cmd/dreampipe
+    binary: dreampipe
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - freebsd
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    
+archives:
+  - id: "dreampipe-archive"
+    builds:
+      - "dreampipe"
+    format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: "{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+      - SECURITY.md
+      - config.toml.sample
+      - examples/*
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - '^ci:'
+      - '^build:'
+      - '^style:'
+      - '^refactor:'
+      - '^perf:'
+      - '^revert:'
+      - '^Merge pull request'
+      - '^Merge branch'
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: 'Bug fixes'
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: 'Security updates'
+      regexp: '^.*?sec(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: Others
+      order: 999
+
+release:
+  prerelease: auto
+  make_latest: true
+  github:
+    owner: hiway
+    name: dreampipe
+  name_template: "{{ .Tag }}"
+  header: |
+    ## Release {{ .Tag }}
+    
+    This release includes binaries for:
+    - FreeBSD (amd64, arm64)
+    - Linux (amd64, arm64) 
+    - macOS (amd64, arm64)
+    
+    ### Installation
+    
+    Download the appropriate binary for your system from the assets below.
+    Extract and move to a directory in your PATH (e.g., `~/bin/dreampipe` or `/usr/local/bin/dreampipe`).
+    
+    ### Usage
+    
+    See the [README](https://github.com/hiway/dreampipe/blob/main/README.md) for detailed usage instructions.
