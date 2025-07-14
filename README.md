@@ -35,8 +35,8 @@ Download the latest release for your system from the [Releases](https://github.c
 2. **Extract the archive** using standard tools available on all platforms:
    ```console
    # Replace with your downloaded filename
-   tar -xzf dreampipe-v1.0.0-linux-amd64.tar.gz
-   cd dreampipe-v1.0.0-linux-amd64
+   tar -xzf dreampipe-v0.1.0-linux-amd64.tar.gz
+   cd dreampipe-v0.1.0-linux-amd64
    ```
 
 3. **Install the binary** to one of the following locations:
