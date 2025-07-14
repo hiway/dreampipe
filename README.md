@@ -39,11 +39,17 @@ Alternatively, you can clone the repository and build `dreampipe` from source us
 
 2.  **Build and install:**
     ```console
-    make install
+    make installuser
     ```
     This command will:
     *   Build the `dreampipe` binary from the source code.
     *   Install the binary to `~/bin/dreampipe`. Ensure `~/bin` is in your `PATH`.
+    
+    Alternatively, you can install system-wide (requires admin access):
+    ```console
+    make install
+    ```
+    This will install the binary to `/usr/local/bin/dreampipe`.
 
 ### Installing Example Scripts
 
