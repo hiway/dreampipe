@@ -102,7 +102,7 @@ func Load(debugMode bool) (Config, error) { // MODIFIED: Added debugMode
 				}
 				// No need to reload here, createConfigFileInteractive populates cfg
 			} else {
-				return Config{}, errors.New("configuration file creation declined by user")
+				return Config{}, fmt.Errorf("configuration file creation declined by user.\n\nTo create a configuration file later, run:\n  dreampipe config\n\nFor more help, visit: https://github.com/hiway/dreampipe#configuration")
 			}
 		} else {
 			// Other error accessing the file (e.g., permissions)
@@ -135,6 +135,8 @@ func Load(debugMode bool) (Config, error) { // MODIFIED: Added debugMode
 // askToCreateConfigFile prompts the user if they want to create the config file.
 func askToCreateConfigFile() bool {
 	reader := bufio.NewReader(os.Stdin)
+	fmt.Printf("Configuration file not found. dreampipe requires at least one LLM provider to be configured.\n")
+	fmt.Printf("Available providers: Ollama (local), Gemini (cloud), Groq (cloud)\n")
 	fmt.Print("Do you want to create it now? (y/N): ")
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(strings.ToLower(input))
@@ -154,9 +156,11 @@ func createConfigFileInteractive(cfgPath string, cfg *Config, debugMode bool) er
 	ollamaURLInput, _ := reader.ReadString('\n')
 	ollamaURLInput = strings.TrimSpace(ollamaURLInput)
 	if ollamaURLInput != "" {
-		if err := validateOllamaURL(ollamaURLInput, debugMode); err != nil { // MODIFIED: Pass debugMode
-			// Warning is printed by validateOllamaURL if debugMode is true
-			// fmt.Fprintf(os.Stderr, "Warning: Ollama URL validation failed: %v. Using provided URL anyway.\n", err)
+		if err := validateOllamaURL(ollamaURLInput, debugMode); err != nil {
+			fmt.Printf("⚠️  Warning: Could not connect to Ollama at %s: %v\n", ollamaURLInput, err)
+			fmt.Printf("   The configuration will be saved anyway. Make sure Ollama is running.\n")
+		} else {
+			fmt.Printf("✅ Successfully connected to Ollama at %s\n", ollamaURLInput)
 		}
 		cfg.LLMs["ollama"] = LLMConfig{BaseURL: ollamaURLInput} // Update map entry
 		configuredProvider = true
@@ -166,6 +170,7 @@ func createConfigFileInteractive(cfgPath string, cfg *Config, debugMode bool) er
 			delete(cfg.LLMs, "ollama")
 		} else {
 			// Keep default URL if user just hits enter
+			fmt.Printf("Using default Ollama URL: %s\n", cfg.LLMs["ollama"].BaseURL)
 			configuredProvider = true // Default counts
 		}
 	}
@@ -177,6 +182,7 @@ func createConfigFileInteractive(cfgPath string, cfg *Config, debugMode bool) er
 	if geminiKeyInput != "" {
 		// Basic validation: non-empty
 		cfg.LLMs["gemini"] = LLMConfig{APIKey: geminiKeyInput}
+		fmt.Printf("✅ Gemini API key configured\n")
 		configuredProvider = true
 	} else {
 		delete(cfg.LLMs, "gemini") // Remove if skipped
@@ -188,6 +194,7 @@ func createConfigFileInteractive(cfgPath string, cfg *Config, debugMode bool) er
 	groqKeyInput = strings.TrimSpace(groqKeyInput)
 	if groqKeyInput != "" {
 		cfg.LLMs["groq"] = LLMConfig{APIKey: groqKeyInput}
+		fmt.Printf("✅ Groq API key configured\n")
 		configuredProvider = true
 	} else {
 		delete(cfg.LLMs, "groq") // Remove if skipped
@@ -195,11 +202,19 @@ func createConfigFileInteractive(cfgPath string, cfg *Config, debugMode bool) er
 
 	// --- Check if at least one provider is configured ---
 	if !configuredProvider {
+		fmt.Printf("\n❌ No LLM providers configured.\n")
+		fmt.Printf("You need at least one provider to use dreampipe.\n")
+		fmt.Printf("Run 'dreampipe config' to try again.\n")
 		return errors.New("at least one LLM provider must be configured")
 	}
 
 	// --- Default Provider ---
-	fmt.Printf("Enter default LLM provider (e.g., ollama, gemini, groq; default: %s): ", cfg.DefaultProvider)
+	availableProviders := make([]string, 0, len(cfg.LLMs))
+	for provider := range cfg.LLMs {
+		availableProviders = append(availableProviders, provider)
+	}
+
+	fmt.Printf("Enter default LLM provider (available: %s; default: %s): ", strings.Join(availableProviders, ", "), cfg.DefaultProvider)
 	defaultProviderInput, _ := reader.ReadString('\n')
 	defaultProviderInput = strings.TrimSpace(defaultProviderInput)
 	if defaultProviderInput != "" {
@@ -207,6 +222,7 @@ func createConfigFileInteractive(cfgPath string, cfg *Config, debugMode bool) er
 			return fmt.Errorf("invalid default provider '%s': no configuration found for this provider", defaultProviderInput)
 		}
 		cfg.DefaultProvider = defaultProviderInput
+		fmt.Printf("✅ Default provider set to: %s\n", defaultProviderInput)
 	} else if _, exists := cfg.LLMs[cfg.DefaultProvider]; !exists {
 		// If user skipped and the original default isn't configured anymore, pick the first available one
 		for provider := range cfg.LLMs {
@@ -214,6 +230,8 @@ func createConfigFileInteractive(cfgPath string, cfg *Config, debugMode bool) er
 			fmt.Printf("Default provider '%s' not configured, setting default to '%s'.\n", defaultConfig().DefaultProvider, cfg.DefaultProvider)
 			break
 		}
+	} else {
+		fmt.Printf("✅ Using default provider: %s\n", cfg.DefaultProvider)
 	}
 
 	// --- Create Directory ---
@@ -237,6 +255,12 @@ func createConfigFileInteractive(cfgPath string, cfg *Config, debugMode bool) er
 	if err := encoder.Encode(cfg); err != nil {
 		return fmt.Errorf("failed to encode configuration to TOML: %w", err)
 	}
+
+	fmt.Printf("\n✅ Configuration file created successfully at %s\n", cfgPath)
+	fmt.Printf("You can now use dreampipe! Try:\n")
+	fmt.Printf("  echo 'Hello' | dreampipe 'translate to pirate speak'\n")
+	fmt.Printf("  df -h | dreampipe 'write a haiku about storage'\n")
+	fmt.Printf("\nTo edit configuration later, run: dreampipe config\n")
 
 	return nil // Success
 }

@@ -119,6 +119,20 @@ clean:
 	@rm -f $(BINARY_NAME)
 	@rm -rf dist/
 
+## test: Run all tests
+.PHONY: test
+test:
+	@echo "Running tests..."
+	@go test -v ./...
+
+## test-coverage: Run tests with coverage
+.PHONY: test-coverage
+test-coverage:
+	@echo "Running tests with coverage..."
+	@go test -v -coverprofile=coverage.out ./...
+	@go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated: coverage.html"
+
 ## run: Run the application, passing through arguments
 # Example: make run ARGS="your instruction here"
 # Example: echo "hello" | make run ARGS="translate to pirate"
@@ -268,6 +282,8 @@ help:
 	@echo "  setup               Install required development tools (Go)"
 	@echo "  check-deps          Check if required dependencies are installed"
 	@echo "  clean               Remove the built binary and dist directory"
+	@echo "  test                Run all tests"
+	@echo "  test-coverage       Run tests with coverage"
 	@echo "  run                 Run the application, passing through arguments"
 	@echo "  build               Build the application for the current OS and architecture"
 	@echo "  build-all           Build the application for all supported OS and architectures"

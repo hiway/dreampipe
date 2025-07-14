@@ -4,7 +4,13 @@ Adaptive Unix Shell Pipes and Scripts in Natural Language
 
 ## Quick Start
 
-Transform shell command output into creative or structured responses using natural language:
+**First, you need to configure at least one LLM provider:**
+
+```console
+$ dreampipe config
+```
+
+**Then transform shell command output into creative or structured responses:**
 
 ```console
 $ df -h | dreampipe "Write a haiku about the storage situation"
@@ -32,11 +38,12 @@ Download the latest release for your system from the [Releases](https://github.c
    shasum -a 256 -c --ignore-missing checksums.txt
    ```
 
-2. **Extract the archive** using standard tools available on all platforms:
+2. **Extract the archive** into a subdirectory:
    ```console
    # Replace with your downloaded filename
-   tar -xzf dreampipe-v0.1.0-linux-amd64.tar.gz
-   cd dreampipe-v0.1.0-linux-amd64
+   mkdir dreampipe-v0.1.0
+   tar -xzf dreampipe-v0.1.0-linux-amd64.tar.gz -C dreampipe-v0.1.0
+   cd dreampipe-v0.1.0
    ```
 
 3. **Install the binary** to one of the following locations:
@@ -49,7 +56,7 @@ Download the latest release for your system from the [Releases](https://github.c
    mkdir -p ~/bin
    
    # Move the binary
-   mv dreampipe ~/bin/dreampipe
+   cp dreampipe ~/bin/dreampipe
    
    # Make sure ~/bin is in your PATH (choose one based on your shell)
    # For bash/zsh:
@@ -64,7 +71,7 @@ Download the latest release for your system from the [Releases](https://github.c
    **For system-wide installation:**
    ```console
    # Requires admin privileges
-   sudo mv dreampipe /usr/local/bin/dreampipe
+   sudo cp dreampipe /usr/local/bin/dreampipe
    ```
 
 4. **Optionally install example scripts** to `~/bin/`:
@@ -85,6 +92,24 @@ Download the latest release for your system from the [Releases](https://github.c
 5. **Verify installation:**
    ```console
    dreampipe --version
+   ```
+
+6. **Configure dreampipe:**
+   On first run, `dreampipe` will prompt you to create a configuration file. You'll need to provide API keys for at least one LLM provider:
+   
+   ```console
+   # This will guide you through initial configuration
+   dreampipe config
+   ```
+   
+   **LLM Provider Options:**
+   - **Ollama** (local): Install and run [Ollama](https://ollama.ai/) locally, then use default settings
+   - **Gemini** (cloud): Get an API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+   - **Groq** (cloud): Get an API key from [Groq Console](https://console.groq.com/keys)
+
+7. **Test your installation:**
+   ```console
+   echo "Hello, World!" | dreampipe "translate to pirate speak"
    ```
 
 ### Or, Build from Source
@@ -137,17 +162,59 @@ Large language models are like super smart talking parrots. You can tell them so
 
 `dreampipe` uses a configuration file located at `$XDG_CONFIG_HOME/dreampipe/config.toml` (typically `~/.config/dreampipe/config.toml`).
 
-To easily open and edit this file, you can use the `config` subcommand:
+### First-Time Setup
+
+On your first run, `dreampipe` will automatically prompt you to create a configuration file:
 
 ```console
 $ dreampipe config
 ```
 
-This command will attempt to open the configuration file in your preferred editor (from `$EDITOR` environment variable) or a common default editor if `$EDITOR` is not set (e.g., nano, vim, VS Code).
+This command will:
+1. Create the configuration file if it doesn't exist
+2. Guide you through setting up at least one LLM provider
+3. Open the configuration file in your preferred editor
 
-If the configuration file does not exist, `dreampipe` will create a default one for you when you first run `dreampipe` or `dreampipe config`.
+### LLM Provider Setup
 
-See `config.toml.sample` for all available options.
+You need to configure at least one LLM provider:
+
+#### Ollama (Local, Free)
+1. Install [Ollama](https://ollama.ai/) on your system
+2. Run `ollama serve` to start the server
+3. Pull a model: `ollama pull llama3`
+4. Use default settings in dreampipe config (http://localhost:11434)
+
+#### Gemini (Cloud, API Key Required)
+1. Get an API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Enter the API key when prompted during configuration
+
+#### Groq (Cloud, API Key Required)
+1. Get an API key from [Groq Console](https://console.groq.com/keys)
+2. Enter the API key when prompted during configuration
+
+### Manual Configuration
+
+You can also manually edit the configuration file. See `config.toml.sample` for all available options.
+
+### Troubleshooting
+
+**"configuration file creation declined by user"**
+- Run `dreampipe config` to create the configuration file
+- You need at least one LLM provider configured
+
+**"Missing instruction" error**
+- Always provide an instruction: `dreampipe "your instruction"`
+- Or create a script with shebang: `#!/usr/bin/env dreampipe`
+
+**Connection issues with Ollama**
+- Make sure Ollama is running: `ollama serve`
+- Check if a model is available: `ollama list`
+- Pull a model if needed: `ollama pull llama3`
+
+**API key issues**
+- Make sure your API keys are valid and have proper permissions
+- Check your API usage limits/quotas
 
 ## Usage Examples
 

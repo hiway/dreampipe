@@ -95,6 +95,10 @@ func main() {
 	// `flag.Args()` will contain this script path if no other non-flag args are given.
 	if len(args) == 0 {
 		fmt.Fprintf(os.Stderr, "Error: Missing instruction.\n\n")
+		fmt.Fprintf(os.Stderr, "Examples:\n")
+		fmt.Fprintf(os.Stderr, "  echo 'Hello' | dreampipe 'translate to pirate speak'\n")
+		fmt.Fprintf(os.Stderr, "  df -h | dreampipe 'write a haiku about storage'\n")
+		fmt.Fprintf(os.Stderr, "  dreampipe config  # Configure LLM providers\n\n")
 		flag.Usage()
 		os.Exit(1)
 	}
