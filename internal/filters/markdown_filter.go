@@ -17,22 +17,35 @@ func (f *MarkdownCodeBlockFilter) Apply(input string) string {
 	}
 
 	firstLine := strings.TrimSpace(lines[0])
-	lastLine := strings.TrimSpace(lines[len(lines)-1])
 
-	if strings.HasPrefix(firstLine, "```") && strings.HasPrefix(lastLine, "```") {
+	// Find the last line that contains closing ```
+	lastLineIndex := -1
+	for i := len(lines) - 1; i >= 0; i-- {
+		if strings.TrimSpace(lines[i]) == "```" {
+			lastLineIndex = i
+			break
+		}
+	}
+
+	if strings.HasPrefix(firstLine, "```") && lastLineIndex != -1 {
 		// Check if the first line is just "```" or "```language"
 		// and the last line is just "```"
-		if len(lines) == 2 { // Only ``` and ```
+		if lastLineIndex == 1 { // Only ``` and ``` (lines 0 and 1)
 			return ""
 		}
-		// Remove the first and last lines
-		filteredLines := lines[1 : len(lines)-1]
-		// Join the remaining lines, ensuring a trailing newline if the original had one
-		// and the content is not empty.
+
+		// Remove the first and last lines (up to the closing ```)
+		filteredLines := lines[1:lastLineIndex]
+
+		// Join the remaining lines
 		output := strings.Join(filteredLines, "\n")
-		if strings.HasSuffix(input, "\n") && len(output) > 0 && !strings.HasSuffix(output, "\n") {
+
+		// If the original input had a trailing newline after the closing ```
+		// and we have content, preserve the trailing newline
+		if strings.HasSuffix(input, "\n") && len(output) > 0 {
 			return output + "\n"
 		}
+
 		return output
 	}
 

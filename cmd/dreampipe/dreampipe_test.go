@@ -127,21 +127,19 @@ func TestDreampipe_AdHocMode_Success(t *testing.T) {
 	defer func() { llm.GetClient = originalGetClient }()
 
 	var stdoutBuf, stderrBuf bytes.Buffer
-	stdinPipeReader, _, _ := os.Pipe() // stdinPipeWriter is not used directly here
 
+	// Test without debug mode
+	pReader, pWriter, _ := os.Pipe()
 	streams := &iohandler.Streams{
-		In:  stdinPipeReader,
+		In:  pReader,
 		Out: &stdoutBuf,
 		Err: &stderrBuf,
 	}
 
-	// Test without debug mode
 	runnerNoDebug := app.NewRunner(cfg, streams, false)
+
+	// Write test data and close pipe in a goroutine
 	go func() {
-		// Need to reset or use a new pipe for each run if input is consumed
-		// For this test, let's re-pipe for clarity, though a single pipe could be managed.
-		pReader, pWriter, _ := os.Pipe()
-		streams.In = pReader // Update streams.In for this run
 		defer pWriter.Close()
 		fmt.Fprint(pWriter, "Test input data no debug")
 	}()
@@ -195,12 +193,13 @@ func TestDreampipe_AdHocMode_Success(t *testing.T) {
 	stderrBuf.Reset() // Reset for the debug run
 
 	// Test with debug mode
+	pReaderDebug, pWriterDebug, _ := os.Pipe()
+	streams.In = pReaderDebug // Update streams.In for this run
+
 	runnerDebug := app.NewRunner(cfg, streams, true)
 	go func() {
-		pReader, pWriter, _ := os.Pipe()
-		streams.In = pReader // Update streams.In for this run
-		defer pWriter.Close()
-		fmt.Fprint(pWriter, "Test input data debug")
+		defer pWriterDebug.Close()
+		fmt.Fprint(pWriterDebug, "Test input data debug")
 	}()
 	instructionDebug := "Test ad-hoc instruction debug"
 	err = runnerDebug.Run(app.ModeAdHoc, instructionDebug)
@@ -264,7 +263,7 @@ Translate this script input.`
 	defer func() { llm.GetClient = originalGetClient }()
 
 	var stdoutBuf, stderrBuf bytes.Buffer
-	stdinPipeReader, stdinPipeWriter, _ := os.Pipe() // stdinPipeWriter IS used in the goroutine
+	stdinPipeReader, stdinPipeWriter, _ := os.Pipe()
 
 	streams := &iohandler.Streams{
 		In:  stdinPipeReader,
@@ -364,8 +363,14 @@ Translate this script input.`
 func TestDreampipe_AdHocMode_MissingInstruction(t *testing.T) {
 	cfg := config.Config{DefaultProvider: "fakeLLM", LLMs: map[string]config.LLMConfig{"fakeLLM": {}}}
 	var stdoutBuf, stderrBuf bytes.Buffer
-	streams := &iohandler.Streams{In: strings.NewReader("some input"), Out: &stdoutBuf, Err: &stderrBuf}
+	pReader, pWriter, _ := os.Pipe()
+	streams := &iohandler.Streams{In: pReader, Out: &stdoutBuf, Err: &stderrBuf}
 	runner := app.NewRunner(cfg, streams, false)
+
+	go func() {
+		defer pWriter.Close()
+		fmt.Fprint(pWriter, "some input")
+	}()
 
 	err := runner.Run(app.ModeAdHoc, "") // Empty instruction
 	if err == nil {
@@ -380,8 +385,14 @@ func TestDreampipe_AdHocMode_MissingInstruction(t *testing.T) {
 func TestDreampipe_ScriptMode_FileNotExist(t *testing.T) {
 	cfg := config.Config{DefaultProvider: "fakeLLM", LLMs: map[string]config.LLMConfig{"fakeLLM": {}}}
 	var stdoutBuf, stderrBuf bytes.Buffer
-	streams := &iohandler.Streams{In: strings.NewReader("some input"), Out: &stdoutBuf, Err: &stderrBuf}
+	pReader, pWriter, _ := os.Pipe()
+	streams := &iohandler.Streams{In: pReader, Out: &stdoutBuf, Err: &stderrBuf}
 	runner := app.NewRunner(cfg, streams, false)
+
+	go func() {
+		defer pWriter.Close()
+		fmt.Fprint(pWriter, "some input")
+	}()
 
 	err := runner.Run(app.ModeScript, "/path/to/nonexistent/script")
 	if err == nil {
@@ -410,8 +421,14 @@ func TestDreampipe_LLMError(t *testing.T) {
 	defer func() { llm.GetClient = originalGetClient }()
 
 	var stdoutBuf, stderrBuf bytes.Buffer
-	streams := &iohandler.Streams{In: strings.NewReader("input"), Out: &stdoutBuf, Err: &stderrBuf}
-	runner := app.NewRunner(cfg, streams, false) // Debug false, errors should still print
+	pReader, pWriter, _ := os.Pipe()
+	streams := &iohandler.Streams{In: pReader, Out: &stdoutBuf, Err: &stderrBuf}
+	runner := app.NewRunner(cfg, streams, false) // Debug false
+
+	go func() {
+		defer pWriter.Close()
+		fmt.Fprint(pWriter, "input")
+	}()
 
 	err := runner.Run(app.ModeAdHoc, "test prompt")
 	if err == nil {
@@ -426,7 +443,16 @@ func TestDreampipe_LLMError(t *testing.T) {
 
 	// Test with debug true, error message should still be the same
 	stderrBuf.Reset()
+
+	pReaderDebug, pWriterDebug, _ := os.Pipe()
+	streams.In = pReaderDebug
+
 	runnerDebug := app.NewRunner(cfg, streams, true)
+	go func() {
+		defer pWriterDebug.Close()
+		fmt.Fprint(pWriterDebug, "input")
+	}()
+
 	err = runnerDebug.Run(app.ModeAdHoc, "test prompt")
 	if err == nil {
 		t.Errorf("Expected error from LLM to propagate (debug mode), but got nil")
@@ -469,8 +495,14 @@ func TestDreampipe_LLMTimeout(t *testing.T) {
 	defer func() { llm.GetClient = originalGetClient }()
 
 	var stdoutBuf, stderrBuf bytes.Buffer
-	streams := &iohandler.Streams{In: strings.NewReader("input"), Out: &stdoutBuf, Err: &stderrBuf}
+	pReader, pWriter, _ := os.Pipe()
+	streams := &iohandler.Streams{In: pReader, Out: &stdoutBuf, Err: &stderrBuf}
 	runner := app.NewRunner(cfg, streams, false) // Debug false
+
+	go func() {
+		defer pWriter.Close()
+		fmt.Fprint(pWriter, "input")
+	}()
 
 	err := runner.Run(app.ModeAdHoc, "test prompt for timeout")
 	if err == nil {
@@ -556,8 +588,14 @@ request_timeout_seconds = 10
 	defer func() { llm.GetClient = originalGetClient }()
 
 	var stdoutBuf, stderrBuf bytes.Buffer
-	streams := &iohandler.Streams{In: strings.NewReader("config test input"), Out: &stdoutBuf, Err: &stderrBuf}
+	pReader, pWriter, _ := os.Pipe()
+	streams := &iohandler.Streams{In: pReader, Out: &stdoutBuf, Err: &stderrBuf}
 	runner := app.NewRunner(loadedCfg, streams, false) // Use the loadedCfg, debug false
+
+	go func() {
+		defer pWriter.Close()
+		fmt.Fprint(pWriter, "config test input")
+	}()
 
 	err = runner.Run(app.ModeAdHoc, "Config load test instruction")
 	if err != nil {
@@ -620,8 +658,14 @@ request_timeout_seconds = 15
 	defer func() { llm.GetClient = originalGetClient }()
 
 	var stdoutBuf, stderrBuf bytes.Buffer
-	streams := &iohandler.Streams{In: strings.NewReader("ollama test input"), Out: &stdoutBuf, Err: &stderrBuf}
+	pReader, pWriter, _ := os.Pipe()
+	streams := &iohandler.Streams{In: pReader, Out: &stdoutBuf, Err: &stderrBuf}
 	runner := app.NewRunner(loadedCfg, streams, false) // Debug false
+
+	go func() {
+		defer pWriter.Close()
+		fmt.Fprint(pWriter, "ollama test input")
+	}()
 
 	err = runner.Run(app.ModeAdHoc, "Ollama config load test instruction")
 	if err != nil {
@@ -684,8 +728,14 @@ request_timeout_seconds = 25
 	defer func() { llm.GetClient = originalGetClient }()
 
 	var stdoutBuf, stderrBuf bytes.Buffer
-	streams := &iohandler.Streams{In: strings.NewReader("groq test input"), Out: &stdoutBuf, Err: &stderrBuf}
+	pReader, pWriter, _ := os.Pipe()
+	streams := &iohandler.Streams{In: pReader, Out: &stdoutBuf, Err: &stderrBuf}
 	runner := app.NewRunner(loadedCfg, streams, false) // Debug false
+
+	go func() {
+		defer pWriter.Close()
+		fmt.Fprint(pWriter, "groq test input")
+	}()
 
 	err = runner.Run(app.ModeAdHoc, "Groq config load test instruction")
 	if err != nil {
@@ -720,8 +770,14 @@ func TestDreampipe_MissingProviderConfig(t *testing.T) {
 
 	// Also test the runner's behavior (it should fail early)
 	var stdoutBuf, stderrBuf bytes.Buffer
-	streams := &iohandler.Streams{In: strings.NewReader("input"), Out: &stdoutBuf, Err: &stderrBuf}
+	pReader, pWriter, _ := os.Pipe()
+	streams := &iohandler.Streams{In: pReader, Out: &stdoutBuf, Err: &stderrBuf}
 	runner := app.NewRunner(cfg, streams, false) // Debug false
+
+	go func() {
+		defer pWriter.Close()
+		fmt.Fprint(pWriter, "input")
+	}()
 
 	runErr := runner.Run(app.ModeAdHoc, "test")
 	if runErr == nil {
