@@ -72,6 +72,32 @@ install-examples:
 	done
 	@echo "Example scripts installed."
 
+## uninstall-examples: Remove example scripts from $(INSTALL_DIR)
+.PHONY: uninstall-examples
+uninstall-examples:
+	@echo "Removing example scripts from $(INSTALL_DIR)..."
+	@mkdir -p $(INSTALL_DIR)
+	@for example_file in examples/*.md; do \
+		filename=$$(basename "$$example_file" .md); \
+		installed_file="$(INSTALL_DIR)/$$filename"; \
+		if [ -f "$$installed_file" ]; then \
+			if cmp -s "$$example_file" "$$installed_file"; then \
+				echo "Removing $$filename from $(INSTALL_DIR)..."; \
+				rm -f "$$installed_file"; \
+			else \
+				if [ "$(FORCE)" = "true" ]; then \
+					echo "Force removing modified $$filename from $(INSTALL_DIR)..."; \
+					rm -f "$$installed_file"; \
+				else \
+					echo "Warning: $$filename has been modified, skipping removal. Use FORCE=true to remove anyway."; \
+				fi; \
+			fi; \
+		else \
+			echo "$$filename not found in $(INSTALL_DIR), skipping..."; \
+		fi; \
+	done
+	@echo "Example scripts removal completed."
+
 ## help: Show this help message
 .PHONY: help
 help:
@@ -86,6 +112,10 @@ help:
 	@echo "  uninstall           Remove the application from /usr/local/bin"
 	@echo "  uninstalluser       Remove the application from $(INSTALL_DIR)"
 	@echo "  install-examples    Install example scripts to $(INSTALL_DIR)"
+	@echo "  uninstall-examples  Remove example scripts from $(INSTALL_DIR)"
 	@echo "  help                Show this help message"
+	@echo ""
+	@echo "Options:"
+	@echo "  FORCE=true          Force removal of modified examples in uninstall-examples"
 
 .DEFAULT_GOAL := help
