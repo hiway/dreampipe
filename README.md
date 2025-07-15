@@ -446,10 +446,19 @@ Process substitution is a shell feature (common in `bash`, `zsh`) that allows th
     ```console
     $ diff -u original_text.txt <(cat original_text.txt | dreampipe "Translate this to pirate speak")
     ```
-    If `dreampipe` were to accept file arguments for prompts or context (it currently uses stdin for data and command-line args for ad-hoc prompts), process substitution could also be used to provide these dynamically:
+
+*   Use the `--context` flag to provide additional context from files or process substitution:
     ```console
-    # Hypothetical: dreampipe takes a context file and data on stdin
     $ some_command | dreampipe --context <(generate_context_dynamically) "Analyze based on context"
+    ```
+    
+    **Examples:**
+    ```console
+    # Using a context file
+    $ echo "Hello world" | dreampipe --context context.txt "translate to pirate speak"
+    
+    # Using process substitution for dynamic context
+    $ echo "Server error occurred" | dreampipe --context <(date) "Create an incident report"
     ```
 
 ### Structured Data Awareness

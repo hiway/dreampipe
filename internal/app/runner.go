@@ -44,7 +44,8 @@ func (r *Runner) LogInfo(format string, args ...interface{}) {
 }
 
 // Run executes the main dreampipe logic based on the mode and instruction/path.
-func (r *Runner) Run(mode RunMode, instructionOrPath string) error {
+// Context data is optional and can be empty.
+func (r *Runner) Run(mode RunMode, instructionOrPath string, contextData string) error {
 	// 1. Determine the actual user instruction (read file if needed)
 	userInstruction, err := resolveInstruction(mode, instructionOrPath)
 	if err != nil {
@@ -63,6 +64,11 @@ func (r *Runner) Run(mode RunMode, instructionOrPath string) error {
 		r.LogInfo("Using instruction from script '%s'", instructionOrPath)
 	}
 
+	// Inform user if context is being used
+	if contextData != "" {
+		r.LogInfo("Using context data (%d bytes)", len(contextData))
+	}
+
 	// 2. Read input data from stdin
 	// Note: This reads *all* input, respecting the current limitation.
 	r.LogInfo("Reading from stdin...") // Inform user
@@ -75,35 +81,15 @@ func (r *Runner) Run(mode RunMode, instructionOrPath string) error {
 	r.LogInfo("Finished reading stdin (%d bytes)", len(inputDataBytes))
 
 	// 3. Construct the final prompt
-	// TODO: Implement the prompt package properly.
-	// Assuming a simple builder function for now.
-	finalPrompt := prompt.Build(agentPrompt, userInstruction, inputData)
-	// --- Placeholder for prompt.Build ---
-	// finalPrompt := fmt.Sprintf("%s\n\n---\n\nYour task:\n\n%s\n\n---\n\nInput:\n\n%s",
-	// agentPrompt, userInstruction, inputData)
-	// --- End Placeholder ---
+	finalPrompt := prompt.Build(agentPrompt, userInstruction, inputData, contextData)
 
 	// 4. Initialize LLM Client
-	// TODO: Implement the llm package and factory properly.
-	// Assuming a factory function GetClient for now.
 	r.LogInfo("Initializing LLM client for provider: %s", r.config.DefaultProvider)
 	llmClient, err := llm.GetClient(r.config, r.debug)
 	if err != nil {
 		r.streams.WriteErrorToStderr("Error initializing LLM client: %v", err)
 		return err
 	}
-	// --- Placeholder for llm.Client and llm.GetClient ---
-	// type placeholderLLMClient struct{}
-	// func (c *placeholderLLMClient) Generate(ctx context.Context, p string) (string, error) {
-	// // Simulate LLM call
-	// time.Sleep(50 * time.Millisecond)
-	// if strings.Contains(p, "fail") { // Test error case
-	// return "", fmt.Errorf("simulated LLM error")
-	// }
-	// return fmt.Sprintf("LLM processed prompt for task: '%s'", userInstruction), nil
-	// }
-	// llmClient := &placeholderLLMClient{}
-	// --- End Placeholder ---
 
 	// 5. Send prompt to LLM
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(r.config.RequestTimeoutSeconds)*time.Second)

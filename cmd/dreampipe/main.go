@@ -26,6 +26,7 @@ func main() {
 	versionFlag := flag.Bool("version", false, "Print version information and exit")
 	debugFlagShort := flag.Bool("d", false, "Enable debug mode (shorthand)")
 	debugFlagLong := flag.Bool("debug", false, "Enable debug mode")
+	contextFlag := flag.String("context", "", "Provide context from a file or process substitution")
 	// Add other potential flags here later (e.g., -provider, -config)
 	// providerFlag := flag.String("provider", "", "Override LLM provider (e.g., ollama, gemini)")
 
@@ -139,8 +140,19 @@ func main() {
 	// --- Create and Run Application ---
 	runner := app.NewRunner(cfg, stdio, debugMode) // Inject dependencies
 
+	// Read context if provided
+	var contextData string
+	if *contextFlag != "" {
+		contextBytes, err := os.ReadFile(*contextFlag)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error reading context file '%s': %v\n", *contextFlag, err)
+			os.Exit(1)
+		}
+		contextData = string(contextBytes)
+	}
+
 	// Run the core application logic
-	err = runner.Run(mode, instruction)
+	err = runner.Run(mode, instruction, contextData)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)

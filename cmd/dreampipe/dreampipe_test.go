@@ -145,7 +145,7 @@ func TestDreampipe_AdHocMode_Success(t *testing.T) {
 	}()
 
 	instruction := "Test ad-hoc instruction no debug"
-	err := runnerNoDebug.Run(app.ModeAdHoc, instruction)
+	err := runnerNoDebug.Run(app.ModeAdHoc, instruction, "")
 
 	if err != nil {
 		t.Errorf("runnerNoDebug.Run() failed: %v. Stderr: %s", err, stderrBuf.String())
@@ -202,7 +202,7 @@ func TestDreampipe_AdHocMode_Success(t *testing.T) {
 		fmt.Fprint(pWriterDebug, "Test input data debug")
 	}()
 	instructionDebug := "Test ad-hoc instruction debug"
-	err = runnerDebug.Run(app.ModeAdHoc, instructionDebug)
+	err = runnerDebug.Run(app.ModeAdHoc, instructionDebug, "")
 
 	if err != nil {
 		t.Errorf("runnerDebug.Run() failed: %v. Stderr: %s", err, stderrBuf.String())
@@ -277,7 +277,7 @@ Translate this script input.`
 		fmt.Fprint(stdinPipeWriter, "Piped script data")
 	}()
 
-	err := runner.Run(app.ModeScript, scriptPath)
+	err := runner.Run(app.ModeScript, scriptPath, "")
 
 	if err != nil {
 		t.Errorf("runner.Run() failed for script mode: %v. Stderr: %s", err, stderrBuf.String())
@@ -337,7 +337,7 @@ Translate this script input.`
 		fmt.Fprint(stdinPipeWriterDebug, "Piped script data debug")
 	}()
 
-	err = runnerDebug.Run(app.ModeScript, scriptPath)
+	err = runnerDebug.Run(app.ModeScript, scriptPath, "")
 	if err != nil {
 		t.Errorf("runnerDebug.Run() failed for script mode: %v. Stderr: %s", err, stderrBuf.String())
 	}
@@ -372,7 +372,7 @@ func TestDreampipe_AdHocMode_MissingInstruction(t *testing.T) {
 		fmt.Fprint(pWriter, "some input")
 	}()
 
-	err := runner.Run(app.ModeAdHoc, "") // Empty instruction
+	err := runner.Run(app.ModeAdHoc, "", "") // Empty instruction
 	if err == nil {
 		t.Errorf("Expected error for missing ad-hoc instruction, but got nil")
 	}
@@ -394,7 +394,7 @@ func TestDreampipe_ScriptMode_FileNotExist(t *testing.T) {
 		fmt.Fprint(pWriter, "some input")
 	}()
 
-	err := runner.Run(app.ModeScript, "/path/to/nonexistent/script")
+	err := runner.Run(app.ModeScript, "/path/to/nonexistent/script", "")
 	if err == nil {
 		t.Errorf("Expected error for non-existent script file, but got nil")
 	}
@@ -430,7 +430,7 @@ func TestDreampipe_LLMError(t *testing.T) {
 		fmt.Fprint(pWriter, "input")
 	}()
 
-	err := runner.Run(app.ModeAdHoc, "test prompt")
+	err := runner.Run(app.ModeAdHoc, "test prompt", "")
 	if err == nil {
 		t.Errorf("Expected error from LLM to propagate, but got nil")
 	}
@@ -453,7 +453,7 @@ func TestDreampipe_LLMError(t *testing.T) {
 		fmt.Fprint(pWriterDebug, "input")
 	}()
 
-	err = runnerDebug.Run(app.ModeAdHoc, "test prompt")
+	err = runnerDebug.Run(app.ModeAdHoc, "test prompt", "")
 	if err == nil {
 		t.Errorf("Expected error from LLM to propagate (debug mode), but got nil")
 	}
@@ -504,7 +504,7 @@ func TestDreampipe_LLMTimeout(t *testing.T) {
 		fmt.Fprint(pWriter, "input")
 	}()
 
-	err := runner.Run(app.ModeAdHoc, "test prompt for timeout")
+	err := runner.Run(app.ModeAdHoc, "test prompt for timeout", "")
 	if err == nil {
 		t.Errorf("Expected timeout error, but got nil")
 	}
@@ -526,7 +526,7 @@ func TestDreampipe_LLMTimeout(t *testing.T) {
 		fmt.Fprint(stdinWriterDebug, "input for debug timeout")
 	}()
 
-	err = runnerDebug.Run(app.ModeAdHoc, "test prompt for timeout debug")
+	err = runnerDebug.Run(app.ModeAdHoc, "test prompt for timeout debug", "")
 	if err == nil {
 		t.Errorf("Expected timeout error (debug mode), but got nil")
 	}
@@ -597,7 +597,7 @@ request_timeout_seconds = 10
 		fmt.Fprint(pWriter, "config test input")
 	}()
 
-	err = runner.Run(app.ModeAdHoc, "Config load test instruction")
+	err = runner.Run(app.ModeAdHoc, "Config load test instruction", "")
 	if err != nil {
 		t.Errorf("runner.Run() with loaded config failed: %v. Stderr: %s", err, stderrBuf.String())
 	}
@@ -667,7 +667,7 @@ request_timeout_seconds = 15
 		fmt.Fprint(pWriter, "ollama test input")
 	}()
 
-	err = runner.Run(app.ModeAdHoc, "Ollama config load test instruction")
+	err = runner.Run(app.ModeAdHoc, "Ollama config load test instruction", "")
 	if err != nil {
 		t.Errorf("runner.Run() with loaded ollama config failed: %v. Stderr: %s", err, stderrBuf.String())
 	}
@@ -737,7 +737,7 @@ request_timeout_seconds = 25
 		fmt.Fprint(pWriter, "groq test input")
 	}()
 
-	err = runner.Run(app.ModeAdHoc, "Groq config load test instruction")
+	err = runner.Run(app.ModeAdHoc, "Groq config load test instruction", "")
 	if err != nil {
 		t.Errorf("runner.Run() with loaded groq config failed: %v. Stderr: %s", err, stderrBuf.String())
 	}
@@ -779,7 +779,7 @@ func TestDreampipe_MissingProviderConfig(t *testing.T) {
 		fmt.Fprint(pWriter, "input")
 	}()
 
-	runErr := runner.Run(app.ModeAdHoc, "test")
+	runErr := runner.Run(app.ModeAdHoc, "test", "")
 	if runErr == nil {
 		t.Errorf("runner.Run() should have failed due to missing provider config, but got nil")
 	}
