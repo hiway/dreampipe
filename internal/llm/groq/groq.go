@@ -14,11 +14,11 @@ import (
 )
 
 const (
-	defaultGroqModel = "llama3-8b-8192" // A common default, user can override
+	defaultGroqModel = "llama3-8b-8192"
 	providerName     = "groq"
 	groqAPIEndpoint  = "https://api.groq.com/openai/v1/chat/completions"
-	maxRetries       = 1 // Simple retry for transient network issues, can be configured
-	retryDelay       = 1 * time.Second
+	maxRetries       = 2
+	baseRetryDelay   = 500 * time.Millisecond
 )
 
 // Client implements the llm.Client interface for Groq.
@@ -26,6 +26,7 @@ type Client struct {
 	httpClient *http.Client
 	apiKey     string
 	modelName  string
+	debug      bool
 }
 
 // groqChatMessage represents a single message in the chat completion request.
@@ -106,6 +107,7 @@ func NewClient(apiKey string, modelOverride string, requestTimeoutSeconds int, d
 		},
 		apiKey:    apiKey,
 		modelName: modelToUse,
+		debug:     debugMode,
 	}, nil
 }
 
@@ -155,25 +157,32 @@ func (c *Client) Generate(ctx context.Context, prompt string) (string, error) {
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
 
-		respErr := func() error {
-			var err error
-			resp, err = c.httpClient.Do(req)
-			return err
-		}()
-		if respErr != nil {
-			lastErr = fmt.Errorf("failed to send request to Groq API: %w", respErr)
-			if ctx.Err() == context.Canceled || ctx.Err() == context.DeadlineExceeded {
-				return "", lastErr // Don't retry on context errors
-			}
-			log.Printf("Groq request attempt %d failed: %v. Retrying in %v...", i+1, respErr, retryDelay)
-			time.Sleep(retryDelay)
-			continue
+		resp, lastErr = c.httpClient.Do(req)
+		if lastErr == nil {
+			break // Success, exit retry loop
 		}
-		// If request was successful (even if API returned an error status), break retry loop
-		break
+
+		// Don't retry on context errors
+		if ctx.Err() != nil {
+			return "", fmt.Errorf("failed to send request to Groq API: %w", lastErr)
+		}
+
+		// Calculate exponential backoff delay
+		backoff := baseRetryDelay * time.Duration(1<<i) // 500ms, 1s, 2s...
+		if c.debug {
+			log.Printf("Groq request attempt %d failed: %v. Retrying in %v...", i+1, lastErr, backoff)
+		}
+
+		// Context-aware sleep
+		select {
+		case <-ctx.Done():
+			return "", fmt.Errorf("failed to send request to Groq API: %w", lastErr)
+		case <-time.After(backoff):
+			// Continue to next retry
+		}
 	}
-	if lastErr != nil { // This means all retries failed
-		return "", lastErr
+	if lastErr != nil {
+		return "", fmt.Errorf("failed to send request to Groq API after %d attempts: %w", maxRetries+1, lastErr)
 	}
 	defer resp.Body.Close()
 
@@ -199,16 +208,14 @@ func (c *Client) Generate(ctx context.Context, prompt string) (string, error) {
 	}
 
 	if len(groqResp.Choices) == 0 || groqResp.Choices[0].Message.Content == "" {
-		// This could also indicate a content filter or other issue.
-		log.Printf("Groq response details: ID=%s, Model=%s, FinishReason=%s, Usage=%+v",
-			groqResp.ID, groqResp.Model,
-			func() string {
-				if len(groqResp.Choices) > 0 {
-					return groqResp.Choices[0].FinishReason
-				}
-				return "N/A"
-			}(),
-			groqResp.Usage)
+		if c.debug {
+			finishReason := "N/A"
+			if len(groqResp.Choices) > 0 {
+				finishReason = groqResp.Choices[0].FinishReason
+			}
+			log.Printf("Groq response details: ID=%s, Model=%s, FinishReason=%s, Usage=%+v",
+				groqResp.ID, groqResp.Model, finishReason, groqResp.Usage)
+		}
 		return "", fmt.Errorf("groq response contained no choices or empty message content. HTTP Status: %s", resp.Status)
 	}
 

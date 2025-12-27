@@ -4,7 +4,7 @@ package gemini
 import (
 	"context"
 	"fmt"
-	"log" // For logging initialization errors if needed
+	"log"
 
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
@@ -19,6 +19,7 @@ const (
 type Client struct {
 	genaiClient *genai.Client
 	modelName   string
+	debug       bool
 }
 
 // NewClient creates a new Gemini client.
@@ -52,6 +53,7 @@ func NewClient(ctx context.Context, apiKey string, modelOverride string, debugMo
 	return &Client{
 		genaiClient: genaiClient,
 		modelName:   modelToUse,
+		debug:       debugMode,
 	}, nil
 }
 
@@ -91,11 +93,9 @@ func (c *Client) Generate(ctx context.Context, prompt string) (string, error) {
 	for _, part := range resp.Candidates[0].Content.Parts {
 		if txt, ok := part.(genai.Text); ok {
 			resultText += string(txt)
-		} else {
+		} else if c.debug {
 			// dreampipe currently only expects text output from the LLM.
-			// If other parts are returned (e.g. function calls, blobs), we ignore them for now.
-			// This log can be noisy, consider making it debug conditional if it becomes an issue.
-			// For now, keeping it as it indicates unexpected parts.
+			// Log non-text parts only in debug mode.
 			log.Printf("Gemini client received non-text part: %T. Ignoring.", part)
 		}
 	}
