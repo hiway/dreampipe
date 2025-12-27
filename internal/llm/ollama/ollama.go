@@ -32,10 +32,7 @@ type Client struct {
 type ollamaGenerateRequest struct {
 	Model  string `json:"model"`
 	Prompt string `json:"prompt"`
-	Stream bool   `json:"stream"` // We'll use false for dreampipe's current non-streaming behavior
-	// Add other options like System, Template, Context, Options if needed later
-	// System  string                 `json:"system,omitempty"`
-	// Options map[string]interface{} `json:"options,omitempty"`
+	Stream bool   `json:"stream"`
 }
 
 // ollamaGenerateResponse is the structure for the response from Ollama's /api/generate
@@ -43,16 +40,9 @@ type ollamaGenerateRequest struct {
 type ollamaGenerateResponse struct {
 	Model     string    `json:"model"`
 	CreatedAt time.Time `json:"created_at"`
-	Response  string    `json:"response"` // This is the generated text
+	Response  string    `json:"response"`
 	Done      bool      `json:"done"`
-	// Context            []int                  `json:"context,omitempty"` // For subsequent requests
-	// TotalDuration      time.Duration          `json:"total_duration,omitempty"`
-	// LoadDuration       time.Duration          `json:"load_duration,omitempty"`
-	// PromptEvalCount    int                    `json:"prompt_eval_count,omitempty"`
-	// PromptEvalDuration time.Duration          `json:"prompt_eval_duration,omitempty"`
-	// EvalCount          int                    `json:"eval_count,omitempty"`
-	// EvalDuration       time.Duration          `json:"eval_duration,omitempty"`
-	Error string `json:"error,omitempty"` // Ollama might return an error field
+	Error     string    `json:"error,omitempty"`
 }
 
 // NewClient creates a new Ollama client.
@@ -175,12 +165,4 @@ func (c *Client) Generate(ctx context.Context, prompt string) (string, error) {
 // ProviderName returns the name of this provider.
 func (c *Client) ProviderName() string {
 	return providerName
-}
-
-// Close is a placeholder as net/http.Client typically doesn't need explicit closing
-// for its default transport, but can be implemented if custom transports are used.
-func (c *Client) Close() error {
-	// If c.httpClient.Transport needs cleanup, do it here.
-	// For the default transport, this is usually a no-op.
-	return nil
 }

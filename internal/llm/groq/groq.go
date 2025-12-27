@@ -56,7 +56,6 @@ type groqChatCompletionResponseChoice struct {
 	Index        int                                     `json:"index"`
 	Message      groqChatCompletionResponseChoiceMessage `json:"message"`
 	FinishReason string                                  `json:"finish_reason"`
-	// LogProbs     interface{}                           `json:"logprobs,omitempty"` // Not used for now
 }
 
 // groqUsage tracks token usage.
@@ -74,8 +73,7 @@ type groqChatCompletionResponse struct {
 	Model   string                             `json:"model"`
 	Choices []groqChatCompletionResponseChoice `json:"choices"`
 	Usage   groqUsage                          `json:"usage"`
-	// SystemFingerprint string                             `json:"system_fingerprint,omitempty"` // Not used for now
-	Error *struct { // Groq might return an error object directly
+	Error   *struct {
 		Message string `json:"message"`
 		Type    string `json:"type"`
 		Param   string `json:"param,omitempty"`
@@ -220,9 +218,4 @@ func (c *Client) Generate(ctx context.Context, prompt string) (string, error) {
 // ProviderName returns the name of this provider.
 func (c *Client) ProviderName() string {
 	return providerName
-}
-
-// Close is a placeholder.
-func (c *Client) Close() error {
-	return nil
 }

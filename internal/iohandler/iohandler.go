@@ -17,15 +17,6 @@ type Streams struct {
 	Err io.Writer
 }
 
-// DefaultOSStreams returns a Streams struct initialized with os.Stdin, os.Stdout, and os.Stderr.
-func DefaultOSStreams() *Streams {
-	return &Streams{
-		In:  os.Stdin,
-		Out: os.Stdout,
-		Err: os.Stderr,
-	}
-}
-
 // ReadAllFromStdin reads all data from the configured Stdin stream.
 // It's a convenience wrapper around io.ReadAll.
 func (s *Streams) ReadAllFromStdin() ([]byte, error) {
@@ -70,12 +61,10 @@ func (s *Streams) WriteToStdout(data []byte) error {
 	if len(data) > 0 && data[len(data)-1] != '\n' {
 		_, nlErr := s.Out.Write([]byte("\n"))
 		if nlErr != nil {
-			// Log the newline error but prioritize the original write error if any
 			return fmt.Errorf("failed to write newline to stdout: %w", nlErr)
 		}
-		// fmt.Fprintf(s.Err, "Warning: failed to write trailing newline to stdout: %v\n", nlErr)
 	}
-	return err
+	return nil
 }
 
 // WriteStringToStdout writes the given string to the configured Stdout stream.
