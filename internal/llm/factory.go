@@ -5,17 +5,30 @@ import (
 	"context" // Required for Gemini client initialization
 	"fmt"
 
-	"github.com/hiway/dreampipe/internal/config"     // Adjust import path
-	"github.com/hiway/dreampipe/internal/llm/gemini" // Adjust import path
-	"github.com/hiway/dreampipe/internal/llm/groq"   // Adjust import path - ADDED
-	"github.com/hiway/dreampipe/internal/llm/ollama" // Adjust import path
+	"github.com/hiway/dreampipe/internal/config"
+	"github.com/hiway/dreampipe/internal/llm/gemini"
+	"github.com/hiway/dreampipe/internal/llm/groq"
+	"github.com/hiway/dreampipe/internal/llm/ollama"
 )
 
 // GetClient is a factory function that returns an LLM client based on the
 // DefaultProvider specified in the configuration.
 // Making it a variable to allow for easy mocking in tests.
 var GetClient func(cfg config.Config, debugMode bool) (Client, error) = func(cfg config.Config, debugMode bool) (Client, error) {
+	return GetClientWithOverrides(cfg, "", "", debugMode)
+}
+
+// GetClientWithOverrides is a factory function that returns an LLM client with optional overrides.
+// If providerOverride is non-empty, it's used instead of cfg.DefaultProvider.
+// If modelOverride is non-empty, it's used instead of the provider's configured model.
+// Making it a variable to allow for easy mocking in tests.
+var GetClientWithOverrides func(cfg config.Config, providerOverride, modelOverride string, debugMode bool) (Client, error) = func(cfg config.Config, providerOverride, modelOverride string, debugMode bool) (Client, error) {
+	// Determine which provider to use
 	providerName := cfg.DefaultProvider
+	if providerOverride != "" {
+		providerName = providerOverride
+	}
+
 	if providerName == "" {
 		return nil, fmt.Errorf("no default LLM provider specified in configuration")
 	}
@@ -23,6 +36,12 @@ var GetClient func(cfg config.Config, debugMode bool) (Client, error) = func(cfg
 	llmCfg, exists := cfg.LLMs[providerName]
 	if !exists {
 		return nil, fmt.Errorf("configuration for provider '%s' not found", providerName)
+	}
+
+	// Apply model override if provided
+	effectiveModel := llmCfg.Model
+	if modelOverride != "" {
+		effectiveModel = modelOverride
 	}
 
 	requestTimeout := cfg.RequestTimeoutSeconds
@@ -35,17 +54,17 @@ var GetClient func(cfg config.Config, debugMode bool) (Client, error) = func(cfg
 		if llmCfg.APIKey == "" {
 			return nil, fmt.Errorf("API key for Gemini not found in configuration")
 		}
-		return gemini.NewClient(context.Background(), llmCfg.APIKey, llmCfg.Model, debugMode)
+		return gemini.NewClient(context.Background(), llmCfg.APIKey, effectiveModel, debugMode)
 	case "ollama":
 		if llmCfg.BaseURL == "" {
 			return nil, fmt.Errorf("base URL for Ollama not found in configuration")
 		}
-		return ollama.NewClient(llmCfg.BaseURL, llmCfg.Model, requestTimeout, debugMode)
+		return ollama.NewClient(llmCfg.BaseURL, effectiveModel, requestTimeout, debugMode)
 	case "groq":
 		if llmCfg.APIKey == "" {
 			return nil, fmt.Errorf("API key for Groq not found in configuration")
 		}
-		return groq.NewClient(llmCfg.APIKey, llmCfg.Model, requestTimeout, debugMode)
+		return groq.NewClient(llmCfg.APIKey, effectiveModel, requestTimeout, debugMode)
 	default:
 		return nil, fmt.Errorf("unsupported LLM provider: %s", providerName)
 	}

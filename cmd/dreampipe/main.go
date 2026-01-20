@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"       // Added for executing editor
-	"path/filepath" // Added for config path
+	"os/exec"
+	"path/filepath"
 	"strings"
 
-	// --- Internal Imports ---
 	"github.com/hiway/dreampipe/internal/app"
 	"github.com/hiway/dreampipe/internal/config"
 	"github.com/hiway/dreampipe/internal/iohandler"
@@ -19,16 +18,12 @@ import (
 var version = "dev"
 
 func main() {
-	// --- Command Line Flags ---
-	// Subcommands
 	configCmd := flag.NewFlagSet("config", flag.ExitOnError)
 
 	versionFlag := flag.Bool("version", false, "Print version information and exit")
 	debugFlagShort := flag.Bool("d", false, "Enable debug mode (shorthand)")
 	debugFlagLong := flag.Bool("debug", false, "Enable debug mode")
 	contextFlag := flag.String("context", "", "Provide context from a file or process substitution")
-	// Add other potential flags here later (e.g., -provider, -config)
-	// providerFlag := flag.String("provider", "", "Override LLM provider (e.g., ollama, gemini)")
 
 	// Customize flag usage message
 	flag.Usage = func() {
@@ -43,7 +38,6 @@ func main() {
 
 	flag.Parse()
 
-	// --- Handle Subcommands ---
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "config":
@@ -58,7 +52,6 @@ func main() {
 		}
 	}
 
-	// --- Handle Version Flag ---
 	if *versionFlag {
 		fmt.Printf("dreampipe version %s\n", version)
 		os.Exit(0)
@@ -67,9 +60,6 @@ func main() {
 	// Determine debug mode status
 	debugMode := *debugFlagShort || *debugFlagLong
 
-	// --- Load Configuration ---
-	// Placeholder: Implement loading from environment variables, config files etc.
-	// The config should contain API keys, default provider, timeouts, etc.
 	cfg, err := config.Load(debugMode)
 	if err != nil {
 		// Use log.Fatalf for critical startup errors
@@ -79,12 +69,7 @@ func main() {
 		}
 		log.Fatalf("Error loading configuration: %v (run with -d or --debug for more details if available)", err)
 	}
-	// Example: Override provider from flag if implemented
-	// if *providerFlag != "" {
-	//     cfg.LLMProvider = *providerFlag
-	// }
 
-	// --- Determine Mode & Instruction ---
 	var mode app.RunMode
 	var instruction string
 
@@ -129,16 +114,13 @@ func main() {
 		instruction = strings.Join(args, " ")
 	}
 
-	// --- Initialize I/O Handler ---
-	// Pass standard OS streams to the application core
 	stdio := &iohandler.Streams{
 		In:  os.Stdin,
 		Out: os.Stdout,
 		Err: os.Stderr,
 	}
 
-	// --- Create and Run Application ---
-	runner := app.NewRunner(cfg, stdio, debugMode) // Inject dependencies
+	runner := app.NewRunner(cfg, stdio, debugMode)
 
 	// Read context if provided
 	var contextData string
@@ -158,13 +140,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	// --- Exit ---
-	os.Exit(0) // Success
+	os.Exit(0)
 }
 
 // openConfigEditor finds an editor and opens the config file.
 func openConfigEditor(debugMode bool) error {
-	cfgPath, err := config.GetConfigFilePath() // This function needs to be added to config package
+	cfgPath, err := config.GetConfigFilePath()
 	if err != nil {
 		return fmt.Errorf("could not get config file path: %w", err)
 	}

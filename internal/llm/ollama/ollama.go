@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"strings"
 	"time"
-	// No specific Ollama SDK is typically needed, use net/http.
 )
 
 const (
@@ -91,11 +90,10 @@ func (c *Client) Generate(ctx context.Context, prompt string) (string, error) {
 		return "", fmt.Errorf("Ollama client not initialized")
 	}
 
-	// Construct the request payload
 	payload := ollamaGenerateRequest{
 		Model:  c.modelName,
 		Prompt: prompt,
-		Stream: false, // dreampipe reads full input, so non-streaming response is appropriate
+		Stream: false,
 	}
 
 	payloadBytes, err := json.Marshal(payload)

@@ -5,16 +5,14 @@ import (
 	"fmt"
 	"time"
 
-	// --- Internal Imports ---
-	"github.com/hiway/dreampipe/internal/config"    // Adjust import path
-	"github.com/hiway/dreampipe/internal/filters"   // Add filters package
-	"github.com/hiway/dreampipe/internal/iohandler" // Adjust import path
-	"github.com/hiway/dreampipe/internal/llm"       // Adjust import path - Placeholder
-	"github.com/hiway/dreampipe/internal/prompt"    // Adjust import path - Placeholder
+	"github.com/hiway/dreampipe/internal/config"
+	"github.com/hiway/dreampipe/internal/filters"
+	"github.com/hiway/dreampipe/internal/iohandler"
+	"github.com/hiway/dreampipe/internal/llm"
+	"github.com/hiway/dreampipe/internal/prompt"
 )
 
 // agentPrompt is the static prefix defining the LLM's role.
-// TODO: Consider making this configurable in config.go if needed later.
 const agentPrompt = `You are a Unix command line filter, you will follow the instructions below to transform, translate, convert, edit or modify the input provided below to the desired outcome.`
 
 // Runner encapsulates the core application logic and dependencies.
@@ -46,14 +44,14 @@ func (r *Runner) LogInfo(format string, args ...interface{}) {
 // Run executes the main dreampipe logic based on the mode and instruction/path.
 // Context data is optional and can be empty.
 func (r *Runner) Run(mode RunMode, instructionOrPath string, contextData string) error {
-	// 1. Determine the actual user instruction (read file if needed)
-	userInstruction, err := resolveInstruction(mode, instructionOrPath)
+	// 1. Determine the actual user instruction and metadata (read file if needed)
+	resolved, err := resolveInstruction(mode, instructionOrPath)
 	if err != nil {
 		// resolveInstruction failed (e.g., file not found, bad mode)
 		r.streams.WriteErrorToStderr("Error determining instruction: %v", err)
 		return err
 	}
-	if userInstruction == "" {
+	if resolved.Instruction == "" {
 		err = fmt.Errorf("resolved user instruction is empty")
 		r.streams.WriteErrorToStderr("Error: %v", err)
 		return err
@@ -62,6 +60,13 @@ func (r *Runner) Run(mode RunMode, instructionOrPath string, contextData string)
 	// Inform user what instruction is being used (useful for script mode)
 	if mode == ModeScript {
 		r.LogInfo("Using instruction from script '%s'", instructionOrPath)
+		// Log provider/model overrides if present
+		if resolved.Meta.Provider != "" {
+			r.LogInfo("Script specifies provider: %s", resolved.Meta.Provider)
+		}
+		if resolved.Meta.Model != "" {
+			r.LogInfo("Script specifies model: %s", resolved.Meta.Model)
+		}
 	}
 
 	// Inform user if context is being used
@@ -81,11 +86,36 @@ func (r *Runner) Run(mode RunMode, instructionOrPath string, contextData string)
 	r.LogInfo("Finished reading stdin (%d bytes)", len(inputDataBytes))
 
 	// 3. Construct the final prompt
-	finalPrompt := prompt.Build(agentPrompt, userInstruction, inputData, contextData)
+	finalPrompt := prompt.Build(agentPrompt, resolved.Instruction, inputData, contextData)
 
-	// 4. Initialize LLM Client
-	r.LogInfo("Initializing LLM client for provider: %s", r.config.DefaultProvider)
-	llmClient, err := llm.GetClient(r.config, r.debug)
+	// 4. Initialize LLM Client with overrides from script metadata
+	effectiveProvider := r.config.DefaultProvider
+	if resolved.Meta.Provider != "" {
+		effectiveProvider = resolved.Meta.Provider
+		// Validate that the provider exists in config
+		if _, exists := r.config.LLMs[effectiveProvider]; !exists {
+			err := fmt.Errorf("provider '%s' specified in script but not configured", effectiveProvider)
+			r.streams.WriteErrorToStderr("Error: %v", err)
+			return err
+		}
+	}
+
+	r.LogInfo("Initializing LLM client for provider: %s", effectiveProvider)
+
+	// Build a config with overrides for the client factory
+	effectiveConfig := r.config
+	if resolved.Meta.Provider != "" || resolved.Meta.Model != "" {
+		// Apply overrides to the config
+		effectiveConfig.DefaultProvider = effectiveProvider
+		if resolved.Meta.Model != "" {
+			// Update the model in the provider's config
+			providerCfg := effectiveConfig.LLMs[effectiveProvider]
+			providerCfg.Model = resolved.Meta.Model
+			effectiveConfig.LLMs[effectiveProvider] = providerCfg
+		}
+	}
+
+	llmClient, err := llm.GetClient(effectiveConfig, r.debug)
 	if err != nil {
 		r.streams.WriteErrorToStderr("Error initializing LLM client: %v", err)
 		return err

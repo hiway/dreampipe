@@ -74,9 +74,6 @@ func (c *Client) Generate(ctx context.Context, prompt string) (string, error) {
 		return "", fmt.Errorf("failed to generate content from Gemini: %w", err)
 	}
 
-	// Extract text from the response.
-	// The response can have multiple candidates, we'll use the first one.
-	// Each candidate can have multiple parts, we'll concatenate text parts.
 	if len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil || len(resp.Candidates[0].Content.Parts) == 0 {
 		// Check for blocked prompt/response
 		if len(resp.Candidates) > 0 && resp.Candidates[0].FinishReason == genai.FinishReasonSafety {
@@ -94,8 +91,6 @@ func (c *Client) Generate(ctx context.Context, prompt string) (string, error) {
 		if txt, ok := part.(genai.Text); ok {
 			resultText += string(txt)
 		} else if c.debug {
-			// dreampipe currently only expects text output from the LLM.
-			// Log non-text parts only in debug mode.
 			log.Printf("Gemini client received non-text part: %T. Ignoring.", part)
 		}
 	}

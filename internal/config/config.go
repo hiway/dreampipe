@@ -18,8 +18,8 @@ import (
 const (
 	appName         = "dreampipe"
 	configFileName  = "config.toml"
-	DefaultDirPerm  = 0750 // rwxr-x--- // EXPORTED
-	DefaultFilePerm = 0600 // rw------- (Contains potential secrets) // EXPORTED
+	DefaultDirPerm  = 0750 // rwxr-x---
+	DefaultFilePerm = 0600 // rw------- (Contains potential secrets)
 )
 
 // Config holds the application's configuration.
@@ -59,8 +59,7 @@ func defaultConfig() Config {
 }
 
 // GetConfigFilePath determines the appropriate configuration file path based on XDG specs.
-// It was previously getConfigPath.
-func GetConfigFilePath() (string, error) { // EXPORTED and RENAMED
+func GetConfigFilePath() (string, error) {
 	configHome := os.Getenv("XDG_CONFIG_HOME")
 	if configHome == "" {
 		homeDir, err := os.UserHomeDir()
@@ -75,7 +74,7 @@ func GetConfigFilePath() (string, error) { // EXPORTED and RENAMED
 
 // Load reads the configuration file, creates it interactively if missing,
 // merges with defaults, and returns the final Config.
-func Load(debugMode bool) (Config, error) { // MODIFIED: Added debugMode
+func Load(debugMode bool) (Config, error) {
 	cfgPath, err := GetConfigFilePath()
 	if err != nil {
 		return Config{}, fmt.Errorf("failed to determine config path: %w", err)
@@ -111,7 +110,7 @@ func Load(debugMode bool) (Config, error) { // MODIFIED: Added debugMode
 	} else {
 		// File exists, load it and merge over defaults
 		if debugMode {
-			fmt.Printf("Loading configuration from %s\n", cfgPath) // MODIFIED: Conditional print
+			fmt.Printf("Loading configuration from %s\n", cfgPath)
 		}
 		meta, err := toml.DecodeFile(cfgPath, &cfg)
 		if err != nil {
@@ -144,14 +143,13 @@ func askToCreateConfigFile() bool {
 }
 
 // createConfigFileInteractive guides the user through setting up the initial config.
-func createConfigFileInteractive(cfgPath string, cfg *Config, debugMode bool) error { // MODIFIED: Added debugMode
+func createConfigFileInteractive(cfgPath string, cfg *Config, debugMode bool) error {
 	reader := bufio.NewReader(os.Stdin)
 	configuredProvider := false
 
 	fmt.Println("\n--- Initial Configuration ---")
 	fmt.Println("Please provide details for at least one LLM provider.")
 
-	// --- Ollama ---
 	fmt.Printf("Enter Ollama Base URL (leave empty to skip, default: %s): ", cfg.LLMs["ollama"].BaseURL)
 	ollamaURLInput, _ := reader.ReadString('\n')
 	ollamaURLInput = strings.TrimSpace(ollamaURLInput)
@@ -175,7 +173,6 @@ func createConfigFileInteractive(cfgPath string, cfg *Config, debugMode bool) er
 		}
 	}
 
-	// --- Gemini ---
 	fmt.Print("Enter Gemini API Key (leave empty to skip): ")
 	geminiKeyInput, _ := reader.ReadString('\n')
 	geminiKeyInput = strings.TrimSpace(geminiKeyInput)
@@ -185,10 +182,9 @@ func createConfigFileInteractive(cfgPath string, cfg *Config, debugMode bool) er
 		fmt.Printf("✅ Gemini API key configured\n")
 		configuredProvider = true
 	} else {
-		delete(cfg.LLMs, "gemini") // Remove if skipped
+		delete(cfg.LLMs, "gemini")
 	}
 
-	// --- Groq ---
 	fmt.Print("Enter Groq API Key (leave empty to skip): ")
 	groqKeyInput, _ := reader.ReadString('\n')
 	groqKeyInput = strings.TrimSpace(groqKeyInput)
@@ -197,10 +193,9 @@ func createConfigFileInteractive(cfgPath string, cfg *Config, debugMode bool) er
 		fmt.Printf("✅ Groq API key configured\n")
 		configuredProvider = true
 	} else {
-		delete(cfg.LLMs, "groq") // Remove if skipped
+		delete(cfg.LLMs, "groq")
 	}
 
-	// --- Check if at least one provider is configured ---
 	if !configuredProvider {
 		fmt.Printf("\n❌ No LLM providers configured.\n")
 		fmt.Printf("You need at least one provider to use dreampipe.\n")
@@ -208,7 +203,6 @@ func createConfigFileInteractive(cfgPath string, cfg *Config, debugMode bool) er
 		return errors.New("at least one LLM provider must be configured")
 	}
 
-	// --- Default Provider ---
 	availableProviders := make([]string, 0, len(cfg.LLMs))
 	for provider := range cfg.LLMs {
 		availableProviders = append(availableProviders, provider)
@@ -234,14 +228,12 @@ func createConfigFileInteractive(cfgPath string, cfg *Config, debugMode bool) er
 		fmt.Printf("✅ Using default provider: %s\n", cfg.DefaultProvider)
 	}
 
-	// --- Create Directory ---
 	configDir := filepath.Dir(cfgPath)
 	err := os.MkdirAll(configDir, DefaultDirPerm)
 	if err != nil {
 		return fmt.Errorf("failed to create config directory %s: %w", configDir, err)
 	}
 
-	// --- Write File ---
 	file, err := os.OpenFile(cfgPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, DefaultFilePerm)
 	if err != nil {
 		return fmt.Errorf("failed to create config file %s: %w", cfgPath, err)
@@ -266,7 +258,7 @@ func createConfigFileInteractive(cfgPath string, cfg *Config, debugMode bool) er
 }
 
 // validateOllamaURL attempts to connect to the Ollama base URL.
-func validateOllamaURL(rawURL string, debugMode bool) error { // MODIFIED: Added debugMode
+func validateOllamaURL(rawURL string, debugMode bool) error {
 	if rawURL == "" {
 		return errors.New("URL cannot be empty")
 	}
@@ -280,9 +272,6 @@ func validateOllamaURL(rawURL string, debugMode bool) error { // MODIFIED: Added
 		return errors.New("URL scheme must be http or https")
 	}
 
-	// Simple check: try to make a request to the base path.
-	// Ollama usually responds at the root, even if it's just "Ollama is running".
-	// A more robust check might target a specific health endpoint if available (e.g., /api/tags or /api/health)
 	client := &http.Client{
 		Timeout: 5 * time.Second, // Short timeout for validation
 	}
@@ -302,14 +291,8 @@ func validateOllamaURL(rawURL string, debugMode bool) error { // MODIFIED: Added
 	}
 	defer resp.Body.Close()
 
-	// Allow various success codes, maybe even 404 if the base path doesn't serve anything specific
-	// but the connection worked. The main goal is reachability.
-	// if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-	// return fmt.Errorf("server responded with status %s", resp.Status)
-	// }
-	// For now, just succeeding the connection is good enough validation.
 	if debugMode {
-		fmt.Printf("Successfully connected to Ollama at %s (Status: %s)\n", rawURL, resp.Status) // MODIFIED: Conditional print
+		fmt.Printf("Successfully connected to Ollama at %s (Status: %s)\n", rawURL, resp.Status)
 	}
 	return nil
 }

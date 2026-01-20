@@ -118,17 +118,6 @@ func (c *Client) Generate(ctx context.Context, prompt string) (string, error) {
 		return "", fmt.Errorf("groq client not initialized")
 	}
 
-	// Groq's chat completion API expects a list of messages.
-	// We'll create a simple conversation with the system prompt (agent) and user prompt (task + input).
-	// The `dreampipe` agent prompt is: "You are a Unix command line filter, you will follow the instructions below to transform, translate, convert, edit or modify the input provided below to the desired outcome."
-	// The `prompt` variable here is the fully constructed prompt from `prompt.Build`
-	// which already includes the agent prompt, user task, and input data.
-	// For OpenAI-compatible APIs, it's common to send the "system" part as a separate message.
-	// However, our `prompt.Build` combines everything. For simplicity with the current `dreampipe`
-	// prompt structure, we'll send the entire combined prompt as a single "user" message.
-	// If better results are achieved by separating system/user roles, `prompt.Build` and this section
-	// would need adjustment.
-
 	messages := []groqChatMessage{
 		{Role: "user", Content: prompt},
 	}
@@ -136,8 +125,7 @@ func (c *Client) Generate(ctx context.Context, prompt string) (string, error) {
 	payload := groqChatCompletionRequest{
 		Messages: messages,
 		Model:    c.modelName,
-		Stream:   false, // dreampipe expects full response
-		// Temperature: &temp, // Example: can be configurable later
+		Stream:   false,
 	}
 
 	payloadBytes, err := json.Marshal(payload)

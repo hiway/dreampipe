@@ -298,6 +298,36 @@ Save a prompt as a reusable "natural language script." `dreampipe` interprets th
     Ahoy, World!
     ```
 
+#### Script Frontmatter: Overriding Provider and Model
+
+Scripts can include YAML frontmatter to override the default LLM provider and model configured in your `config.toml`. This is useful for:
+- Scripts that work better with specific models
+- Testing different providers
+- Sharing scripts that specify optimal configurations
+
+**Example script with frontmatter:**
+
+```bash
+#!/usr/bin/env dreampipe
+---
+provider: gemini
+model: gemini-1.5-pro
+---
+
+Describe what the code does in a single line
+```
+
+**Frontmatter fields:**
+- `provider`: Override the default provider (e.g., `ollama`, `gemini`, `groq`)
+- `model`: Override the default model for the specified provider
+
+**Notes:**
+- Frontmatter must appear immediately after the shebang line
+- Both fields are optional - you can specify provider only, model only, or both
+- The specified provider must be configured in your `config.toml`
+- If no frontmatter is present, the script uses your default provider and model
+- Frontmatter uses YAML syntax and must be wrapped in `---` delimiters
+
 When you execute `pirate-speak`, the `dreampipe` interpreter (invoked by the shebang `#!/usr/bin/env dreampipe`) reads the instruction "Translate input to pirate speak." It then combines this with a built-in agent prompt and the piped-in data ("Hello, World!") to form a complete request for the LLM. The LLM's response is then outputted.
 
 Let's look at the whole prompt sent to the LLM for the `pirate-speak` example above:

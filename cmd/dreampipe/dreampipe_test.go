@@ -1,4 +1,4 @@
-package main // Assuming main is in the root, or adjust if main is cmd/dreampipe/main.go
+package main
 
 import (
 	"bytes"
@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	// Adjust these import paths to your actual module path
 	"github.com/hiway/dreampipe/internal/app"
 	"github.com/hiway/dreampipe/internal/config"
 	"github.com/hiway/dreampipe/internal/iohandler"
@@ -58,9 +57,6 @@ func (f *fakeLLMClient) GetLastPrompt() string {
 	return f.promptsSent[len(f.promptsSent)-1]
 }
 
-// --- Test Suite Setup ---
-
-// Helper to create a temporary config file for testing
 func createTempConfigFile(t *testing.T, content string) (string, func()) {
 	t.Helper()
 	tmpDir := t.TempDir()
@@ -97,8 +93,6 @@ func createTempScriptFile(t *testing.T, content string) string {
 	tmpFile.Close()
 	return tmpFile.Name()
 }
-
-// --- Tests ---
 
 func TestDreampipe_AdHocMode_Success(t *testing.T) {
 	cfg := config.Config{

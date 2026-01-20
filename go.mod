@@ -6,6 +6,7 @@ require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/google/generative-ai-go v0.20.1
 	google.golang.org/api v0.186.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	// Assuming iohandler is in the parent internal directory
-	"github.com/hiway/dreampipe/internal/iohandler" // Adjust import path
+	"github.com/hiway/dreampipe/internal/frontmatter"
+	"github.com/hiway/dreampipe/internal/iohandler"
 )
 
 // RunMode defines how dreampipe was invoked.
@@ -19,26 +19,36 @@ const (
 	ModeScript
 )
 
+// ResolvedInstruction contains the instruction text and any metadata from script frontmatter.
+type ResolvedInstruction struct {
+	Instruction string
+	Meta        frontmatter.ScriptMeta
+}
+
 // resolveInstruction determines the actual natural language instruction based on the run mode.
-// For ModeScript, it reads the instruction from the specified file path, skipping the shebang.
-// For ModeAdHoc, it returns the provided instruction string directly.
-func resolveInstruction(mode RunMode, instructionOrPath string) (string, error) {
+// For ModeScript, it reads the instruction from the specified file path, skipping the shebang,
+// and parses any frontmatter for metadata.
+// For ModeAdHoc, it returns the provided instruction string directly with empty metadata.
+func resolveInstruction(mode RunMode, instructionOrPath string) (ResolvedInstruction, error) {
 	switch mode {
 	case ModeAdHoc:
 		if instructionOrPath == "" {
-			return "", fmt.Errorf("ad-hoc mode requires a non-empty instruction")
+			return ResolvedInstruction{}, fmt.Errorf("ad-hoc mode requires a non-empty instruction")
 		}
-		// Instruction is provided directly as an argument
-		return strings.TrimSpace(instructionOrPath), nil
+		// Instruction is provided directly as an argument, no metadata
+		return ResolvedInstruction{
+			Instruction: strings.TrimSpace(instructionOrPath),
+			Meta:        frontmatter.ScriptMeta{},
+		}, nil
 
 	case ModeScript:
 		if instructionOrPath == "" {
-			return "", fmt.Errorf("script mode requires a valid file path")
+			return ResolvedInstruction{}, fmt.Errorf("script mode requires a valid file path")
 		}
 		// instructionOrPath is the path to the script file
 		scriptContentBytes, err := iohandler.ReadAllFromFile(instructionOrPath)
 		if err != nil {
-			return "", fmt.Errorf("failed to read script file '%s': %w", instructionOrPath, err)
+			return ResolvedInstruction{}, fmt.Errorf("failed to read script file '%s': %w", instructionOrPath, err)
 		}
 
 		// Find the first newline character to remove the shebang line
@@ -51,16 +61,34 @@ func resolveInstruction(mode RunMode, instructionOrPath string) (string, error) 
 			if strings.HasPrefix(scriptContent, "#!") {
 				// It's likely *only* a shebang line, which means no instruction.
 				// Or user forgot the instruction.
-				return "", fmt.Errorf("script file '%s' seems to contain only a shebang line or is missing a newline after it", instructionOrPath)
+				return ResolvedInstruction{}, fmt.Errorf("script file '%s' seems to contain only a shebang line or is missing a newline after it", instructionOrPath)
 			}
-			return strings.TrimSpace(scriptContent), nil
+			// No shebang, parse as-is
+			meta, instruction, err := frontmatter.Parse(scriptContent)
+			if err != nil {
+				return ResolvedInstruction{}, fmt.Errorf("failed to parse script '%s': %w", instructionOrPath, err)
+			}
+			return ResolvedInstruction{
+				Instruction: instruction,
+				Meta:        meta,
+			}, nil
 		}
 
-		// Extract content after the first newline
-		instruction := string(scriptContentBytes[firstNewline+1:])
-		return strings.TrimSpace(instruction), nil
+		// Extract content after the first newline (skip shebang)
+		contentAfterShebang := string(scriptContentBytes[firstNewline+1:])
+
+		// Parse frontmatter and instruction
+		meta, instruction, err := frontmatter.Parse(contentAfterShebang)
+		if err != nil {
+			return ResolvedInstruction{}, fmt.Errorf("failed to parse script '%s': %w", instructionOrPath, err)
+		}
+
+		return ResolvedInstruction{
+			Instruction: instruction,
+			Meta:        meta,
+		}, nil
 
 	default:
-		return "", fmt.Errorf("unknown run mode: %d", mode)
+		return ResolvedInstruction{}, fmt.Errorf("unknown run mode: %d", mode)
 	}
 }
