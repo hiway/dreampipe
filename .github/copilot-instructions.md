@@ -6,7 +6,9 @@
 - **Ad-hoc pipes**: `df -h | dreampipe "write a haiku about storage"`
 - **Natural language scripts**: Executable files with `#!/usr/bin/env dreampipe` shebang containing natural language instructions
 
-**Data flow**: stdin → prompt builder (agent prompt + user instruction + input data) → LLM API → stdout
+**Data flow**: stdin → prompt builder (agent prompt + optional context + user instruction + input data) → LLM API → output filter → stdout
+
+**Core principle**: Strict Unix philosophy—read stdin, write stdout, errors to stderr, zero dependencies on external files except config.
 
 ## Architecture
 
@@ -52,8 +54,12 @@ make install-examples   # Copy examples/*.md to ~/bin/ (removes .md extension)
 ### Configuration
 Config file: `~/.config/dreampipe/config.toml` (TOML format)
 - First run triggers interactive setup via `config.createConfigFileInteractive()`
-- `dreampipe config` opens config in `$EDITOR`
+- Interactive setup prompts user to select and configure at least one LLM provider
+- If user declines setup, exits with helpful error message directing to `dreampipe config`
+- `dreampipe config` subcommand opens config in `$EDITOR` (falls back to nano/vim/emacs/vi/code)
+- VS Code detection: adds `--wait` flag when opening with `code` command
 - Never hardcode secrets; they go in user config only
+- Config validation includes URL checks (Ollama), reachability tests
 
 ## Code Conventions
 
@@ -74,13 +80,13 @@ if err != nil {
 - Use `fmt.Errorf("context: %w", err)` for wrapping
 
 ### Prompt Construction
-Three-part structure (see `internal/prompt/builder.go`):
+Multi-part structure (see `internal/prompt/builder.go`):
 1. Agent prompt (constant in `runner.go`): "You are a Unix command line filter..."
-2. User instruction (from arg or script file)
-3. Input data (from stdin)
-4. Optional context data (from `--context` flag)
+2. Optional context (from `--context` flag file) - inserted between agent prompt and user task
+3. User instruction (from arg or script file)
+4. Input data (from stdin)
 
-**Security note**: Never execute LLM-generated code. Only process text.
+**Security note**: Never execute LLM-generated code. Only process text. Be aware of prompt injection risks—malicious content in stdin could manipulate LLM output (see `SECURITY.md`).
 
 ### Module Management
 - **DO NOT** manually edit `go.mod` or `go.sum`
@@ -88,6 +94,24 @@ Three-part structure (see `internal/prompt/builder.go`):
 - Current external deps: `github.com/BurntSushi/toml`, `github.com/google/generative-ai-go`
 
 ## Project-Specific Patterns
+
+### First-Run User Experience
+Critical pattern for ensuring smooth user onboarding:
+```go
+// In config.Load():
+if !configFileExists() {
+    if askToCreateConfigFile() {
+        // Interactive prompts guide user through provider selection
+        // and API key/URL entry, with validation steps
+        createConfigFileInteractive()
+    } else {
+        return error: "configuration file creation declined by user"
+    }
+}
+```
+- User must explicitly opt in to config creation (prevents silent failures)
+- Interactive prompts validate input (e.g., Ollama URL reachability, API key format)
+- Error messages always guide user to next action: "Run 'dreampipe config' to create configuration"
 
 ### Dependency Injection
 `Runner` uses constructor injection:
@@ -123,6 +147,16 @@ Strips surrounding ` ```language ... ``` ` blocks if present.
 1. **No streaming**: Input is fully buffered before processing (see README "Important Note on Streaming")
 2. **Shebang limitation**: When invoked as `#!/usr/bin/env dreampipe`, `os.Args[0]` is `dreampipe`, `os.Args[1]` is the script path
 3. **Config required**: First run without config prompts interactive setup; declining exits with helpful error message
+4. **No command execution**: `dreampipe` never executes LLM output—only outputs text to stdout for composability
+
+## Security-First Development
+
+Beyond standard Go security:
+- **Prompt injection awareness**: Input data from stdin may contain malicious instructions meant to manipulate LLM behavior
+- **Data disclosure**: All stdin is sent to LLM provider—never assume user knows this; warn in docs when adding features
+- **No implicit trust**: LLM output could contain suggested commands/code; `dreampipe` never executes these
+- **Timeout enforcement**: All LLM requests use `context.WithTimeout` (default 60s from config)
+- See `SECURITY.md` for OWASP LLM Top 10 considerations (LLM01 prompt injection, LLM06 sensitive info disclosure)
 
 ## Development Guidelines
 
